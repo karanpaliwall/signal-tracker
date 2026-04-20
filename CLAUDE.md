@@ -232,7 +232,7 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 - **Company cards grid** — `minmax(min(360px, 100%), 1fr)` so cards go full-width on phones.
 - **Search debounce** — `signals.js` uses `searchInput` state + `searchTimer` ref (300ms). The raw input value is `searchInput`; the debounced filter value is `filters.search`. `clearFilters()` resets both.
 - **LiveLog fetch** — uses `AbortController` with 3s timeout to cancel hung requests.
-- **Mobile breakpoint** at 768px: filter bar stacks vertically, keyword grid goes 1 column, content bottom-padding is 160px (room for LiveLog bar).
+- **Breakpoints**: `reference.css` at 900px collapses stat-grid to 2 cols and reduces padding — sidebar stays visible. `custom.css` at 768px hides sidebar (hamburger nav), removes main-content left margin, stacks filter bar vertically, shrinks padding to 16px, and wraps `.page-header-top` so title and action buttons stack on narrow phones. Toast repositions above the LiveLog bar (60px from bottom) on mobile. Do NOT add sidebar-hiding logic to the 900px block — it belongs only in the 768px block alongside the mobile header.
 
 ---
 

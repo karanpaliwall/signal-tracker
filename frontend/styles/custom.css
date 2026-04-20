@@ -291,8 +291,13 @@ a.sidebar-item {
 
 /* ── Responsive additions ── */
 @media (max-width: 768px) {
-  /* Enough room for the fixed live-log bar */
-  .main-content { padding-bottom: 160px; }
+  /* Sidebar is hidden — remove left margin and shrink padding */
+  .main-content { margin-left: 0; padding-bottom: 160px; }
+  .page-header { padding-left: 16px; padding-right: 16px; }
+  .page-body { padding-left: 16px; padding-right: 16px; }
+
+  /* Allow page title and action buttons to wrap to a second row */
+  .page-header-top { flex-wrap: wrap; gap: 8px; }
 
   /* Filter bar: stack controls vertically */
   .filter-bar { flex-direction: column; align-items: stretch; }
@@ -301,4 +306,7 @@ a.sidebar-item {
 
   /* Sources keyword grid: single column */
   .keyword-grid { grid-template-columns: 1fr !important; }
+
+  /* Toast: position above the fixed live-log bar */
+  .toast { bottom: 60px; right: 16px; left: 16px; text-align: center; }
 }

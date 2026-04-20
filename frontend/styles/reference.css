@@ -909,12 +909,6 @@ tbody tr:last-child td { border-bottom: none; }
 /* ── Responsive ───────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
-  }
-  .sidebar.open { transform: translateX(0); }
-  .main-content { margin-left: 0; }
   .page-header, .filter-bar, .page-body { padding-left: 20px; padding-right: 20px; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .grid-2 { grid-template-columns: 1fr; }

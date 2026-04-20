@@ -1,0 +1,304 @@
+/*
+ * custom.css — Signal Tracker additions
+ * Supplements reference.css with components not in the base Growleads design system.
+ * Inter font loaded in _app.js via Google Fonts.
+ */
+
+/* ── Colour badges ── */
+.badge-blue {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--blue-400);
+}
+
+.badge-linkedin {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--blue-400);
+  text-transform: capitalize;
+}
+
+.badge-indeed {
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--violet-400);
+  text-transform: capitalize;
+}
+
+.badge-glassdoor {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--emerald-500);
+  text-transform: capitalize;
+}
+
+
+.badge-monster {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--red-400);
+  text-transform: capitalize;
+}
+
+.badge-naukri {
+  background: rgba(251, 146, 60, 0.12);
+  color: var(--orange-400);
+  text-transform: capitalize;
+}
+
+/* ── form-select: dark appearance override ── */
+.form-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235c6080' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+  cursor: pointer;
+}
+
+/* ── Live Log Panel (fixed bottom, visible across all pages) ── */
+.live-log-bar {
+  position: fixed;
+  bottom: 0;
+  left: var(--sidebar-width);
+  right: 0;
+  z-index: 20;
+  background: #0a0c16;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+  font-family: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 768px) {
+  .live-log-bar { left: 0; }
+}
+
+.live-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  user-select: none;
+}
+
+.live-log-body {
+  padding: 8px 14px;
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.log-line {
+  display: grid;
+  grid-template-columns: 60px 110px 1fr;
+  gap: 8px;
+}
+
+.log-ts      { color: var(--text-muted); }
+.log-source  { color: var(--blue-400); }
+.log-msg     { color: var(--text-primary); }
+.log-line-error   .log-msg { color: var(--red-400); }
+.log-line-warning .log-msg { color: var(--amber-400); }
+.log-line-warn    .log-msg { color: var(--amber-400); }
+.log-line-info    .log-msg { color: var(--text-primary); }
+
+/* ── Segmented Pill Tabs ── */
+.tabs-pill {
+  display: inline-flex;
+  background: var(--bg-hover);
+  border-radius: var(--radius);
+  padding: 3px;
+  gap: 2px;
+}
+
+.tab-pill {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: calc(var(--radius) - 2px);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tab-pill:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.tab-pill.active {
+  background: var(--bg-secondary);
+  color: var(--blue-400);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+/* ── Sidebar nav link: strip browser underline ── */
+a.sidebar-item {
+  text-decoration: none;
+}
+
+/* ── Green running dot animation ── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.dot-green {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green-400);
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+/* ── Sidebar status bar ── */
+.sidebar-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-color);
+  margin-top: auto;
+}
+
+.sidebar-status-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--green-400);
+}
+
+/* ── Mobile header ── */
+.mobile-header {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 16px;
+  z-index: 30;
+}
+
+.hamburger-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  margin-left: -6px;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+.hamburger-btn:hover { background: var(--bg-hover); }
+.hamburger-btn span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 1px;
+}
+
+.sidebar-close-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  margin-left: auto;
+}
+
+.nav-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-header      { display: flex; }
+  .main-content       { padding-top: 68px; }
+  .sidebar-close-btn  { display: block; }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 40;
+  }
+  .sidebar.nav-open { transform: translateX(0); }
+
+  .nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 39;
+  }
+}
+
+/* ── Bottom padding so fixed log panel doesn't cover page content ── */
+.main-content {
+  padding-bottom: 40px;
+}
+
+/* ── Filter bar layout ── */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #111426 0%, #0c0e1a 100%);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
+}
+
+/* ── Table row hover via CSS (avoids inline re-renders) ── */
+.roles-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+.roles-table tbody tr {
+  transition: background 0.15s;
+}
+
+/* ── Role title link in company detail ── */
+.role-link {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.role-link:hover {
+  color: var(--blue-400);
+}
+
+/* ── Keyword editor grid (sources page) ── */
+.keyword-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* ── Responsive additions ── */
+@media (max-width: 768px) {
+  /* Enough room for the fixed live-log bar */
+  .main-content { padding-bottom: 160px; }
+
+  /* Filter bar: stack controls vertically */
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-bar .form-select,
+  .filter-bar .form-input { width: 100%; box-sizing: border-box; }
+
+  /* Sources keyword grid: single column */
+  .keyword-grid { grid-template-columns: 1fr !important; }
+}

@@ -1,0 +1,3 @@
+{
+  "_comment": "API rewrites are configured in frontend/next.config.js using RAILWAY_BACKEND_URL env var. Set RAILWAY_BACKEND_URL=https://your-app.railway.app in Vercel dashboard before deploying."
+}

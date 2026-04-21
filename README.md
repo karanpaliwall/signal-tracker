@@ -12,9 +12,9 @@ A multi-platform hiring signal tracker that monitors 5 job boards to detect buyi
 Job Boards → Scrapers → Normalize → Dedup → Claude Haiku → Scoring → Neon DB → Dashboard
 ```
 
-1. **Scrape** — 5 job boards are scraped on demand or on a schedule
+1. **Scrape** — 5 job boards scraped on demand or on a daily schedule
 2. **Classify** — Claude Haiku assigns each role a department + intent signal
-3. **Score** — Companies are scored by volume, recency, and signal type
+3. **Score** — Companies scored by volume, recency, and signal type; priority propagated to all job signals
 4. **Display** — Dashboard shows ranked companies and individual job signals
 
 ---
@@ -38,16 +38,10 @@ Job Boards → Scrapers → Normalize → Dedup → Claude Haiku → Scoring →
 | Backend | Python 3.11, FastAPI, APScheduler, slowapi |
 | Frontend | Next.js 14, React 18 |
 | Database | Neon Postgres (serverless) |
-| AI | Claude Haiku (`claude-haiku-4-5`) |
+| AI | Claude Haiku (`claude-haiku-4-5-20251001`) |
 | Scraping | Apify + LinkedIn free guest API |
 | Email | Resend SDK |
 | Deploy | Railway (backend) + Vercel (frontend) |
-
----
-
-## Screenshots
-
-> Dashboard → Signals Feed → Companies → Company Drill-down → Sources & Config
 
 ---
 
@@ -83,7 +77,9 @@ cp .env.example .env
 | `APIFY_TOKEN` | Yes | Apify for Indeed, Glassdoor, Monster, Naukri |
 | `RESEND_API_KEY` | Yes | Email reports with CSV attachment |
 | `RESEND_FROM` | No | Sender address (default: `signals@resend.dev`) |
-| `API_KEY` | No | Leave empty in dev. Set in Railway for production. |
+| `API_KEY` | No | Leave empty in dev for open access. Set in Railway for production. |
+| `NEXT_PUBLIC_API_KEY` | No | Frontend copy of `API_KEY` — set in Vercel dashboard for production. |
+| `ALLOWED_ORIGINS` | No | CORS origin (e.g. `https://your-app.vercel.app`). Leave unset in dev. |
 
 ### 3. Set up the database
 
@@ -121,47 +117,66 @@ node ./node_modules/next/dist/bin/next dev
 
 | Route | Description |
 |-------|-------------|
-| `/` | Dashboard — stats, pipeline status, recent signals, Run buttons |
-| `/signals` | Paginated job signals feed with filters |
-| `/companies` | Company cards grid sorted by signal strength |
+| `/` | Dashboard — stats, pipeline status, recent signals, Run button |
+| `/signals` | Paginated job signals feed with filters (platform, dept, priority, search) |
+| `/companies` | Company cards grid with search, sorted by signal strength |
 | `/company/[name]` | Company drill-down — score, dept breakdown, all open roles |
 | `/sources` | Sources & Config — platforms, keywords, scheduler, notifications |
-| `/run-log` | Run history — scraper runs and intelligence classification runs |
+| `/run-log` | Paginated run history — scraper runs and intelligence classification runs |
 
 ---
 
-## API Endpoints
+## API Reference
 
 ### Scraping
-```
-POST /api/scrape/run?mode=live|weekly|full   Trigger a scrape run
-POST /api/scrape/stop                         Cancel in-progress run
-GET  /api/scrape/status                       {live_running, weekly_running, ...}
-GET  /api/scrape/log?since=N                  Real-time log polling
-GET  /api/scrape/runs?limit=20                Run history
-```
 
-### Signals & Companies
-```
-GET    /api/signals         Paginated signals (filters: platform, dept, priority, search)
-GET    /api/signals/stats   {total, high_priority, new_today, companies_tracked}
-GET    /api/signals/export  CSV download
-DELETE /api/signals         Delete by IDs
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/scrape/run?mode=live\|weekly` | Trigger a scrape run |
+| `POST` | `/api/scrape/stop` | Cancel in-progress run (stops scrapers + classification) |
+| `GET` | `/api/scrape/status` | `{live_running, weekly_running, intelligence_running}` |
+| `GET` | `/api/scrape/log?since=N` | Real-time log polling (cursor pattern) |
+| `GET` | `/api/scrape/runs?limit=50&offset=0` | Paginated run history — returns `{total, results}` |
 
-GET    /api/companies        Paginated company signals
-GET    /api/companies/{name} Single company with all open roles
-```
+### Signals
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/signals` | Paginated signals. Filters: `platform`, `department`, `priority`, `data_mode`, `search`, `sort_by`, `page`, `page_size` |
+| `GET` | `/api/signals/{id}` | Single signal by UUID |
+| `GET` | `/api/signals/stats` | `{total, high_priority, new_today, companies_tracked}` |
+| `GET` | `/api/signals/export` | CSV download (streaming) |
+| `DELETE` | `/api/signals` | Delete by `ids` array |
+
+### Companies
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/companies` | Paginated companies. Filters: `priority`, `search`, `sort_by` |
+| `GET` | `/api/companies/{name}` | Single company with all open roles |
+| `DELETE` | `/api/companies/{name}` | Delete a company and its signals |
+
+### Intelligence
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/intelligence/run` | Trigger classification on pending records |
+| `GET` | `/api/intelligence/status` | `{pending, processed, failed}` |
 
 ### Config
-```
-GET  /api/sources     Platform configs + keyword lists
-POST /api/sources     Save platform configs + keywords
-GET  /api/scheduler   Scheduler state
-POST /api/scheduler   Update scheduler
-GET  /api/notify/config
-POST /api/notify/config
-POST /api/notify/send   Manually send email report
-```
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/sources` | Platform configs + keyword lists |
+| `POST` | `/api/sources` | Save platform configs + keywords |
+| `GET` | `/api/scheduler` | Scheduler state |
+| `POST` | `/api/scheduler` | Update scheduler (enable/disable, time) |
+| `GET` | `/api/notify/config` | `{enabled, recipients}` |
+| `POST` | `/api/notify/config` | Save notification settings |
+| `POST` | `/api/notify/send` | Manually send email report |
+| `GET` | `/api/health` | `{"status": "ok"}` |
+
+> All write endpoints are rate-limited to 20 requests/minute. In production, all endpoints require an `X-API-Key` header matching the `API_KEY` environment variable.
 
 ---
 
@@ -175,12 +190,14 @@ POST /api/notify/send   Manually send email report
 ### Vercel (Frontend)
 1. Import the `frontend/` directory to Vercel
 2. Set `RAILWAY_BACKEND_URL` in Vercel dashboard (used by `next.config.js` rewrites)
-3. Deploy
+3. Set `NEXT_PUBLIC_API_KEY` to match the `API_KEY` set in Railway
+4. Deploy
 
 ### Pre-deploy checklist
 - [ ] Rotate `APIFY_TOKEN`
 - [ ] Rotate `RESEND_API_KEY`
 - [ ] Set `API_KEY` in Railway for endpoint security
+- [ ] Set `NEXT_PUBLIC_API_KEY` in Vercel (same value)
 - [ ] Set `ALLOWED_ORIGINS` in Railway (e.g. `https://your-app.vercel.app`)
 - [ ] Run `schema.sql` in Neon SQL editor
 
@@ -192,8 +209,42 @@ POST /api/notify/send   Manually send email report
 |-------|---------|
 | `job_signals` | Every normalized job listing. Dedup key: `platform:external_id` |
 | `company_signals` | Aggregated per-company signal scores, upserted after each run |
-| `signal_scraper_runs` | Audit log — one row per platform × mode run |
+| `signal_scraper_runs` | Audit log — one row per platform × mode run, plus intelligence runs |
 | `app_config` | Key/value store for scheduler state, keywords, notify config |
+
+---
+
+## Project Structure
+
+```
+backend/
+  main.py          FastAPI app, all API endpoints
+  pipeline.py      Orchestrates scrape → dedup → classify → score
+  intelligence.py  Claude Haiku classification (batch UPDATE)
+  scoring.py       Company signal aggregation and priority scoring
+  dedup.py         Fuzzy deduplication with rapidfuzz
+  scheduler.py     APScheduler wrapper (state in Postgres)
+  notifier.py      Resend email with streaming CSV attachment
+  database.py      Neon Postgres connection pool
+  models.py        Pydantic request/response models
+  scrapers/
+    base.py        BaseJobScraper with parallel keyword runner
+    linkedin.py    Free guest API scraper
+    indeed.py      Apify actor scraper
+    glassdoor.py   Apify actor scraper
+    monster.py     Apify actor scraper
+    naukri.py      Apify actor scraper
+
+frontend/
+  lib/
+    apiFetch.js    fetch wrapper — injects X-API-Key header in production
+    platforms.js   Shared platform constants (keys, labels, costs)
+  pages/           Next.js pages (index, signals, companies, sources, run-log)
+  components/      Layout, LiveLog, Toast, PriorityBadge, DeptBar
+  styles/          custom.css, reference.css
+
+schema.sql         Full database schema + indexes (run once in Neon)
+```
 
 ---
 

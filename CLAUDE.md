@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A multi-platform hiring signal tracker that monitors 6 job boards to detect buying signals from companies actively hiring. Claude Haiku classifies every role into a department + intent signal (e.g., "Needs outbound pipeline"). Companies are scored by signal strength and surfaced in a Growleads-branded dashboard.
+A multi-platform hiring signal tracker that monitors 5 job boards to detect buying signals from companies actively hiring. Claude Haiku classifies every role into a department + intent signal (e.g., "Needs outbound pipeline"). Companies are scored by signal strength and surfaced in a Growleads-branded dashboard.
 
 **Phase 1 scope**: Signal detection and display only. No outreach.
 
@@ -69,6 +69,8 @@ taskkill //F //PID <PID>                        # double-slash required in bash
 | `RESEND_API_KEY` | Yes | Resend for email notifications with CSV attachment — set in `.env` (rotate before production deploy) |
 | `RESEND_FROM` | No | Sender address (default: `signals@resend.dev`) |
 | `API_KEY` | No | Leave empty in dev for open access. Set in Railway for production. |
+| `NEXT_PUBLIC_API_KEY` | No | Frontend copy of `API_KEY` — set in Vercel dashboard. Injected as `X-API-Key` header by `frontend/lib/apiFetch.js`. |
+| `ALLOWED_ORIGINS` | No | CORS origin for production (e.g. `https://your-app.vercel.app`). Leave unset in dev. |
 
 **Rotate before use**: Generate fresh keys before deploying to production.
 
@@ -122,16 +124,17 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 ### Scraping
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/scrape/run` | Trigger scrape. `?mode=live\|weekly\|full` (full = live then weekly back-to-back) |
-| POST | `/api/scrape/stop` | Set stop flags to cancel in-progress run |
+| POST | `/api/scrape/run` | Trigger scrape. `?mode=live\|weekly` |
+| POST | `/api/scrape/stop` | Set stop flags — cancels scrapers AND intelligence classification |
 | GET | `/api/scrape/status` | `{live_running, weekly_running, intelligence_running}` |
 | GET | `/api/scrape/log?since=N` | Real-time log polling (cursor pattern) |
-| GET | `/api/scrape/runs?limit=20` | Run history from `signal_scraper_runs` |
+| GET | `/api/scrape/runs?limit=50&offset=0` | Paginated run history — returns `{total, results}` |
 
 ### Signals
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/signals` | Paginated job signals. Filters: `platform`, `department`, `priority`, `data_mode`, `search`, `page`, `page_size` |
+| GET | `/api/signals` | Paginated job signals. Filters: `platform`, `department`, `priority`, `data_mode`, `search`, `sort_by`, `page`, `page_size` |
+| GET | `/api/signals/{id}` | Single signal by UUID |
 | GET | `/api/signals/stats` | `{total, high_priority, new_today, companies_tracked}` |
 | GET | `/api/signals/export` | CSV download (streaming, Content-Disposition: attachment) |
 | DELETE | `/api/signals` | Delete by `ids` array |
@@ -139,8 +142,9 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 ### Companies
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/companies` | Paginated company signals. Filters: `priority`, `sort_by` |
+| GET | `/api/companies` | Paginated company signals. Filters: `priority`, `search`, `sort_by` |
 | GET | `/api/companies/{name}` | Single company with all open roles |
+| DELETE | `/api/companies/{name}` | Delete company and its signals (404 if not found) |
 
 ### Intelligence
 | Method | Path | Description |
@@ -193,7 +197,7 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 8. **Log separator** — `lb.log("pipeline", "=== Run started ===")` not `lb.clear()`.
 9. **No second Claude call** — scoring is deterministic rule-based only.
 10. **Windows dev server** — `node ./node_modules/next/dist/bin/next dev` (not npm). Never use `--reload` with uvicorn on Windows.
-11. **Clear BOTH stop flags on trigger** — `trigger_run()` must call `lb.clear_stop("live")` AND `lb.clear_stop("weekly")` for any mode. `stop_run()` sets both flags; if only one is cleared, scrapers check `should_stop("weekly")` and silently return [] — entire run completes in 5 seconds with 0 records, no error.
+11. **Clear ALL three stop flags on trigger** — `trigger_run()` must call `lb.clear_stop("live")`, `lb.clear_stop("weekly")`, AND `lb.clear_stop("intelligence")`. `stop_run()` sets all three; if any is left set, that phase silently returns early with 0 records — no error, run finishes in seconds.
 12. **ON CONFLICT needs partial index predicate** — `ON CONFLICT (job_id) WHERE job_id IS NOT NULL DO NOTHING` (not just `ON CONFLICT (job_id)`).
 13. **scoring.py upsert tuple must have 8 values** — the `company_signals` INSERT targets 8 columns including `last_updated_at`. Add `datetime.now(timezone.utc)` as the 8th element.
 14. **`load_dotenv()` must use absolute path** — `load_dotenv(Path(__file__).parent.parent / ".env")` in both `main.py` and `database.py`.
@@ -201,6 +205,13 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 16. **Intelligence runs once per phase** — `_run_full_pipeline()` calls `_run_pipeline("live")` then `_run_pipeline("weekly")`. Each phase has its own scrape → dedup → intelligence → scoring cycle. Records added by the weekly scrape are classified by the weekly phase's intelligence run. If weekly intelligence fails, those records stay unclassified until the next run. Manually trigger `POST /api/intelligence/run` to classify any leftovers.
 17. **LinkedIn live = 24h window, weekly = 7-day window** — uses `tpr=r86400` for live, `tpr=r604800` for weekly. Live mode legitimately returns fewer results than weekly because it only fetches jobs posted in the last 24 hours. This is expected behaviour, not a bug. Live log lines from LinkedIn may scroll off the LiveLog viewport during a full run since the live phase runs 6 scrapers and generates many log lines before weekly starts.
 18. **Intelligence runs must log to `signal_scraper_runs`** — both `_run_pipeline()` (step 3) and `trigger_intelligence_only()._run()` must call `_create_run_record("intelligence", "intelligence")` before running and `_finish_run_record(...)` after. Column mapping: `jobs_found=pending` (total to classify), `jobs_added=processed` (classified OK), `duplicates=failed` (errored records). The Run Log "Intelligence" tab filters on `mode === 'intelligence'`. Without this, the tab shows "No intelligence runs yet" even after successful runs.
+19. **Intelligence batch UPDATE** — `intelligence.py` collects all classified results into a list, then issues one `execute_values()` UPDATE at the end. Never UPDATE inside the worker thread (was 500 DB round-trips). Workers return `(id, title, dept, seniority, intent, confidence)` tuples.
+20. **`intelligence_running` flag lives in outer finally** — in `pipeline.py`, clear `intelligence_running = False` in the same `finally` block as `live_running`, not in an inner try/finally. If `_create_run_record()` throws between setting the flag and the inner try, only the outer finally runs — the inner finally never executes.
+21. **Priority propagation after scoring** — after `rebuild_company_signals()` upserts `company_signals.overall_priority`, run a follow-up `UPDATE job_signals SET priority = cs.overall_priority FROM company_signals cs WHERE job_signals.company_name = cs.company_name AND job_signals.is_duplicate = FALSE`. Without this, `job_signals.priority` stays at its insert-time default and the Signals page always shows "High Priority: 0".
+22. **API key comparison is timing-safe** — use `secrets.compare_digest(key, _API_KEY)` not `==`. Rate limiter key function uses the API key when present (`f"key:{api_key[:64]}"`) so clients can't bypass per-IP limits by spoofing headers.
+23. **`scrape_runs` returns `{total, results}`** — `GET /api/scrape/runs` returns a paginated object, not a bare list. Frontend `run-log.js` reads `d.results || []` and `d.total || 0`. Pass `limit` and `offset` query params.
+24. **`apiFetch` wrapper for all frontend API calls** — `frontend/lib/apiFetch.js` injects `X-API-Key: NEXT_PUBLIC_API_KEY` when the env var is set. All pages import `apiFetch` instead of `fetch` directly for API calls.
+25. **Shared platform constants** — `frontend/lib/platforms.js` exports `PLATFORMS` (full objects), `PLATFORM_KEYS` (string array), and `PLATFORM_LABEL` (key→label map). Import from here; do not re-declare in individual pages.
 
 ---
 
@@ -208,21 +219,23 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 
 | Route | File | Description |
 |-------|------|-------------|
-| `/` | `pages/index.js` | Dashboard — stats cards, pipeline status, 10 most recent signals (any priority), Run Live + Run Weekly buttons, auto-refreshes every 30s |
+| `/` | `pages/index.js` | Dashboard — stats cards, pipeline status, 10 most recent signals (any priority), Run button, auto-refreshes every 30s |
 | `/signals` | `pages/signals.js` | Paginated job signals feed with filters (platform, dept, priority, search) |
-| `/companies` | `pages/companies.js` | Company cards grid — clickable, navigates to drill-down |
+| `/companies` | `pages/companies.js` | Company cards grid with search input — cards use `<Link>` for keyboard/middle-click nav |
 | `/company/[name]` | `pages/company/[name].js` | Company drill-down — score, role count, dept breakdown, full roles table with job URLs |
 | `/sources` | `pages/sources.js` | Sources & Config — toggle platforms, keywords, scheduler, notifications |
-| `/run-log` | `pages/run-log.js` | Run history from `signal_scraper_runs` table |
+| `/run-log` | `pages/run-log.js` | Paginated run history from `signal_scraper_runs` — only polls when a run is active |
 
 ### UI Rules
-- **Two Run buttons** — `Run Live` (btn-secondary, `mode=live`) and `Run Weekly` (btn-primary, `mode=weekly`). Both collapse to a single `Stop` button while any run is active. No "Run Full" combined button.
+- **Run button** — single `Run` button (`mode=live`). Collapses to a `Stop` button while any run is active.
 - **Dashboard recent signals** — shows 10 most recent signals of any priority (`/api/signals?page_size=10`). NOT filtered to high-priority only.
 - **Dashboard auto-refresh** — `index.js` polls `loadData()` every 30 seconds (idle interval) AND immediately when `isRunning` transitions from `true→false` (run just completed). Uses `useRef(wasRunning)` to detect the transition.
-- **LiveLog** — fixed-bottom global panel in `Layout.js`, starts collapsed. Never add to individual pages.
-- **Company cards** — clickable via `router.push('/company/' + encodeURIComponent(name))`.
+- **LiveLog** — fixed-bottom global panel in `Layout.js`, starts collapsed. Capped at 500 lines (oldest lines dropped). Never add to individual pages.
+- **Company cards** — use `<Link href="...">` (not `router.push`) for keyboard navigation and middle-click support.
 - **Pipeline status** — shared via React Context in `_app.js`, one poll per app. Never poll in multiple components.
-- **Sources & Config defaults** — when API returns empty keyword arrays (fresh DB), keep `DEFAULT_CONFIG` values. Merge API data but only override keyword arrays when `data[key].length > 0`.
+- **Sources & Config defaults** — when API returns empty keyword arrays (fresh DB), keep `DEFAULT_CONFIG` values. Merge API data but only override keyword arrays when `data[k].length > 0`.
+- **Double-fetch guard** — `signals.js` and `companies.js` use a `pageMounted = useRef(false)` guard on the `[page]` effect so it skips on initial mount. The `[filters]`/`[load]` effect handles the initial data load.
+- **Run-log polling** — `run-log.js` only calls `load()` on the 5s interval when `hasRunningRef.current` is true (i.e., at least one run has `status === 'running'`). Avoids polling an idle page every 5 seconds.
 
 ### Responsive Design Patterns
 - **Tables** — all tables sit inside `.table-wrap` (has `overflow-x: auto`). Company detail roles table additionally has an inner `<div style={{ overflowX: 'auto' }}>` wrapper since its parent card has `overflow: hidden`.
@@ -232,7 +245,7 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 - **Company cards grid** — `minmax(min(360px, 100%), 1fr)` so cards go full-width on phones.
 - **Search debounce** — `signals.js` uses `searchInput` state + `searchTimer` ref (300ms). The raw input value is `searchInput`; the debounced filter value is `filters.search`. `clearFilters()` resets both.
 - **LiveLog fetch** — uses `AbortController` with 3s timeout to cancel hung requests.
-- **Breakpoints**: `reference.css` at 900px collapses stat-grid to 2 cols and reduces padding — sidebar stays visible. `custom.css` at 768px hides sidebar (hamburger nav), removes main-content left margin, stacks filter bar vertically, shrinks padding to 16px, and wraps `.page-header-top` so title and action buttons stack on narrow phones. Toast repositions above the LiveLog bar (60px from bottom) on mobile. Do NOT add sidebar-hiding logic to the 900px block — it belongs only in the 768px block alongside the mobile header.
+- **Breakpoints**: `reference.css` at 900px collapses stat-grid to 2 cols and reduces padding — sidebar stays visible. `custom.css` has a single `@media (max-width: 768px)` block that hides sidebar (hamburger nav), removes main-content left margin, stacks filter bar vertically, shrinks padding to 16px, and wraps `.page-header-top`. Toast repositions above the LiveLog bar (60px from bottom) on mobile. Do NOT add sidebar-hiding logic to the 900px block — it belongs only in the 768px block. Do NOT create additional `@media (max-width: 768px)` blocks — add rules to the existing consolidated block.
 
 ---
 
@@ -247,7 +260,8 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 ### Vercel (Frontend)
 1. Import the `frontend/` directory to Vercel
 2. Set `RAILWAY_BACKEND_URL` env var in Vercel dashboard (frontend rewrites via `next.config.js`)
-3. Deploy
+3. Set `NEXT_PUBLIC_API_KEY` to the same value as `API_KEY` in Railway
+4. Deploy
 
 ### Neon (Database)
 1. Create a new Neon project
@@ -258,6 +272,7 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 - Rotate Apify token (current token in `.env` is for dev)
 - Rotate `RESEND_API_KEY` (dev key is in `.env`, generate a new one for prod)
 - Set `API_KEY` in Railway for endpoint security
+- Set `NEXT_PUBLIC_API_KEY` in Vercel (same value as `API_KEY`)
 - Set `ALLOWED_ORIGINS` in Railway (e.g. `https://your-app.vercel.app`)
 
 ---

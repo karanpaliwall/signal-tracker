@@ -69,6 +69,8 @@ def _acquire_conn(pool: psycopg2.pool.ThreadedConnectionPool):
 
 def _discard(pool: psycopg2.pool.ThreadedConnectionPool, conn):
     """Return a broken connection to the pool with close=True so it is discarded."""
+    with _conn_last_used_lock:
+        _conn_last_used.pop(id(conn), None)
     try:
         pool.putconn(conn, close=True)
     except Exception as exc:

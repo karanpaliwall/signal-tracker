@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import PriorityBadge from '../components/PriorityBadge'
 import Toast from '../components/Toast'
+import apiFetch from '../lib/apiFetch'
+import { PLATFORM_KEYS } from '../lib/platforms'
 
 const DEPARTMENTS = ['Sales', 'Engineering', 'Marketing', 'Operations', 'Product', 'Finance', 'Other']
-const PLATFORMS   = ['linkedin', 'indeed', 'glassdoor', 'monster', 'naukri']
+const PLATFORMS   = PLATFORM_KEYS
 const PRIORITIES  = ['high', 'medium', 'low']
 
 export default function Signals() {
@@ -38,7 +40,7 @@ export default function Signals() {
     if (filters.data_mode)  p.set('data_mode',   filters.data_mode)
     if (filters.search)     p.set('search',      filters.search)
     try {
-      const r = await fetch(`/api/signals?${p}`)
+      const r = await apiFetch(`/api/signals?${p}`)
       const d = await r.json()
       setSignals(d.results || [])
       setTotal(d.total || 0)
@@ -47,8 +49,13 @@ export default function Signals() {
   }, [filters])
 
   useEffect(() => { setPage(1); load(1) }, [filters])
+  const pageMounted = useRef(false)
   // intentional: filter changes are handled by the [filters] effect above; this only fires on explicit page navigation
-  useEffect(() => { load(page) }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+  // pageMounted guard prevents a duplicate load on initial mount (the [filters] effect already fires then)
+  useEffect(() => {
+    if (!pageMounted.current) { pageMounted.current = true; return }
+    load(page)
+  }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleFilter(key, val) {
     setFilters(f => ({ ...f, [key]: val }))
@@ -68,7 +75,7 @@ export default function Signals() {
       if (filters.priority)   params.set('priority',    filters.priority)
       if (filters.data_mode)  params.set('data_mode',   filters.data_mode)
       if (filters.search)     params.set('search',      filters.search)
-      const r = await fetch(`/api/signals/export?${params}`)
+      const r = await apiFetch(`/api/signals/export?${params}`)
       const blob = await r.blob()
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
@@ -85,7 +92,7 @@ export default function Signals() {
   async function handleDeleteSelected() {
     if (!selected.size) return
     try {
-      await fetch('/api/signals', {
+      await apiFetch('/api/signals', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: [...selected] }),

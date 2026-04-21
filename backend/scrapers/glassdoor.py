@@ -1,6 +1,5 @@
 import os
 import hashlib
-from typing import Optional
 from apify_client import ApifyClient
 from backend.scrapers.base import BaseJobScraper
 import backend.log_buffer as lb
@@ -41,7 +40,7 @@ class GlassdoorScraper(BaseJobScraper):
 
         return self._run_keywords_parallel(keywords, scrape_one)
 
-    def _normalize(self, raw: dict) -> Optional[dict]:
+    def _normalize(self, raw: dict) -> dict | None:
         job_title = (raw.get("jobTitle") or raw.get("title") or "").strip()
         company   = (raw.get("employerName") or raw.get("companyName") or raw.get("company") or "").strip()
         if not job_title or not company:

@@ -109,6 +109,10 @@ CREATE INDEX IF NOT EXISTS idx_js_search_trgm ON job_signals
 -- Intelligence status query index (used by get_intelligence_status full-table scan).
 CREATE INDEX IF NOT EXISTS idx_js_intel_processed ON job_signals (id) WHERE job_title_normalized IS NOT NULL;
 
+-- Pending intelligence records — optimises the main classification query.
+CREATE INDEX IF NOT EXISTS idx_js_pending ON job_signals (scraped_at DESC)
+  WHERE job_title_normalized IS NULL AND processing_attempts < 5;
+
 
 -- Key/value store for scheduler state, keyword lists, notification settings.
 -- Using Postgres instead of JSON files so state survives Railway container restarts.

@@ -67,9 +67,7 @@
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
 }
 
-@media (max-width: 768px) {
-  .live-log-bar { left: 0; }
-}
+/* (mobile: .live-log-bar rule merged into the single @media block below) */
 
 .live-log-header {
   display: flex;
@@ -225,8 +223,12 @@ a.sidebar-item {
 }
 
 @media (max-width: 768px) {
+  /* Log panel */
+  .live-log-bar { left: 0; }
+
+  /* Mobile header & sidebar */
   .mobile-header      { display: flex; }
-  .main-content       { padding-top: 68px; }
+  .main-content       { padding-top: 68px; margin-left: 0; padding-bottom: 160px; }
   .sidebar-close-btn  { display: block; }
 
   .sidebar {
@@ -245,6 +247,22 @@ a.sidebar-item {
     background: rgba(0,0,0,0.5);
     z-index: 39;
   }
+
+  /* Layout */
+  .page-header { padding-left: 16px; padding-right: 16px; }
+  .page-body   { padding-left: 16px; padding-right: 16px; }
+  .page-header-top { flex-wrap: wrap; gap: 8px; }
+
+  /* Filter bar: stack controls vertically */
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-bar .form-select,
+  .filter-bar .form-input { width: 100%; box-sizing: border-box; }
+
+  /* Sources keyword grid: single column */
+  .keyword-grid { grid-template-columns: 1fr !important; }
+
+  /* Toast: position above the fixed live-log bar */
+  .toast { bottom: 60px; right: 16px; left: 16px; text-align: center; }
 }
 
 /* ── Bottom padding so fixed log panel doesn't cover page content ── */
@@ -417,24 +435,3 @@ tbody tr.row-selected:hover { background: rgba(37, 99, 235, 0.11) !important; }
   margin-bottom: 10px;
 }
 
-/* ── Responsive additions ── */
-@media (max-width: 768px) {
-  /* Sidebar is hidden — remove left margin and shrink padding */
-  .main-content { margin-left: 0; padding-bottom: 160px; }
-  .page-header { padding-left: 16px; padding-right: 16px; }
-  .page-body { padding-left: 16px; padding-right: 16px; }
-
-  /* Allow page title and action buttons to wrap to a second row */
-  .page-header-top { flex-wrap: wrap; gap: 8px; }
-
-  /* Filter bar: stack controls vertically */
-  .filter-bar { flex-direction: column; align-items: stretch; }
-  .filter-bar .form-select,
-  .filter-bar .form-input { width: 100%; box-sizing: border-box; }
-
-  /* Sources keyword grid: single column */
-  .keyword-grid { grid-template-columns: 1fr !important; }
-
-  /* Toast: position above the fixed live-log bar */
-  .toast { bottom: 60px; right: 16px; left: 16px; text-align: center; }
-}

@@ -2,6 +2,7 @@
 APScheduler — daily live run, scheduled time configurable via Sources & Config.
 State persisted in Postgres app_config table (not JSON files — Railway-safe).
 """
+import threading
 import psycopg2.extras
 import pytz
 
@@ -16,13 +17,16 @@ import backend.log_buffer as lb
 IST = pytz.timezone("Asia/Kolkata")
 
 _scheduler: BackgroundScheduler | None = None
+_scheduler_lock = threading.Lock()
 
 
 def _get_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is None:
-        _scheduler = BackgroundScheduler(timezone=IST)
-        _scheduler.start()
+        with _scheduler_lock:
+            if _scheduler is None:
+                _scheduler = BackgroundScheduler(timezone=IST)
+                _scheduler.start()
     return _scheduler
 
 

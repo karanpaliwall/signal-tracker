@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import Toast from '../components/Toast'
+import apiFetch from '../lib/apiFetch'
+import { PLATFORMS } from '../lib/platforms'
 
 const US_KEYWORDS = [
   'Sales Development Representative',
@@ -51,13 +53,7 @@ const DEFAULT_CONFIG = {
   custom_scrapers:    [],
 }
 
-const PLATFORMS = [
-  { key: 'linkedin',  label: 'LinkedIn',  flag: 'US', cost: 'Free' },
-  { key: 'indeed',    label: 'Indeed',    flag: 'US', cost: '~$3.00/1K' },
-  { key: 'glassdoor', label: 'Glassdoor', flag: 'US', cost: '~$3.00/1K' },
-  { key: 'monster',   label: 'Monster',   flag: 'US', cost: '~$0.99/1K' },
-  { key: 'naukri',    label: 'Naukri',    flag: 'IN', cost: '~$1.00/1K' },
-]
+// PLATFORMS imported from lib/platforms.js
 
 const SECTION_INFO = {
   scrapers: (
@@ -109,9 +105,9 @@ export default function Sources() {
   async function loadAll() {
     try {
       const [srcRes, schRes, notifyRes] = await Promise.all([
-        fetch('/api/sources'),
-        fetch('/api/scheduler'),
-        fetch('/api/notify/config'),
+        apiFetch('/api/sources'),
+        apiFetch('/api/scheduler'),
+        apiFetch('/api/notify/config'),
       ])
       if (srcRes.ok) {
         const data = await srcRes.json()
@@ -135,17 +131,17 @@ export default function Sources() {
     setSaving(true)
     try {
       const [r1, r2, r3] = await Promise.all([
-        fetch('/api/sources', {
+        apiFetch('/api/sources', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(config),
         }),
-        fetch('/api/scheduler', {
+        apiFetch('/api/scheduler', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(scheduler),
         }),
-        fetch('/api/notify/config', {
+        apiFetch('/api/notify/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(notify),
@@ -161,7 +157,7 @@ export default function Sources() {
 
   async function sendTestEmail() {
     try {
-      const r = await fetch('/api/notify/send', { method: 'POST' })
+      const r = await apiFetch('/api/notify/send', { method: 'POST' })
       if (r.ok) setToast('Test email sent')
       else { const d = await r.json(); setToast(d.detail || 'Failed') }
     } catch { setToast('Error') }
@@ -306,7 +302,7 @@ export default function Sources() {
               Results per keyword
             </span>
             <input
-              type="number" min="10" max="1000" step="10"
+              type="number" min="1" max="1000" step="10"
               className="form-input"
               style={{ width: 80 }}
               value={config.results_per_keyword ?? 25}
@@ -490,6 +486,12 @@ function AddScraperModal({ onAdd, onClose }) {
   })
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    function onKeyDown(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
   function submit() {
@@ -634,9 +636,16 @@ function ModalField({ label, hint, children }) {
 }
 
 function Toggle({ label, checked, onChange }) {
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(!checked) }
+  }
   return (
     <label
+      role="switch"
+      aria-checked={checked}
+      tabIndex={0}
       onClick={() => onChange(!checked)}
+      onKeyDown={handleKeyDown}
       style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
     >
       <div style={{

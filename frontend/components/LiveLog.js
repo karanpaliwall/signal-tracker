@@ -22,10 +22,13 @@ export default function LiveLog({ isRunning }) {
         if (!r.ok) return
         const data = await r.json()
         if (data.lines && data.lines.length > 0) {
-          setLines(prev => [...prev, ...data.lines])
+          setLines(prev => {
+            const all = [...prev, ...data.lines]
+            return all.length > 500 ? all.slice(-500) : all
+          })
           cur = data.total
         }
-      } catch {}
+      } catch { clearTimeout(timeout) }
     }
 
     poll()

@@ -163,7 +163,8 @@ def _run_pipeline() -> None:
 
         # ── Step 2: Dedup ───────────────────────────────────────────────
         lb.log("pipeline", "Running deduplication...")
-        dedup.run_dedup()
+        dups_caught = dedup.run_dedup()
+        lb.log("pipeline", f"Dedup complete — {dups_caught} duplicates marked")
 
         # ── Step 3: Intelligence (classify) ────────────────────────────
         lb.log("pipeline", "Running Claude Haiku classification...")
@@ -181,9 +182,6 @@ def _run_pipeline() -> None:
         except Exception as e:
             _finish_run_record(intel_run_id, "failed", str(e)[:200])
             raise
-        finally:
-            with _lock:
-                _state["intelligence_running"] = False
 
         if lb.should_stop("live"):
             lb.log("pipeline", "Stopped after intelligence")
@@ -218,6 +216,7 @@ def _run_pipeline() -> None:
     finally:
         with _lock:
             _state["live_running"] = False
+            _state["intelligence_running"] = False
         lb.clear_stop("live")
 
 
@@ -233,6 +232,7 @@ def trigger_run(mode: str = "live") -> bool:
         _state["live_running"] = True
 
     lb.clear_stop("live")
+    lb.clear_stop("intelligence")
     t = threading.Thread(target=_run_pipeline, daemon=True)
     t.start()
     return True
@@ -241,6 +241,7 @@ def trigger_run(mode: str = "live") -> bool:
 def stop_run() -> None:
     """Request stop for any in-progress pipeline run."""
     lb.request_stop("live")
+    lb.request_stop("intelligence")
     lb.log("pipeline", "Stop requested")
 
 

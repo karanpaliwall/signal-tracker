@@ -1,5 +1,6 @@
 import base64
 import csv
+import html
 import io
 import os
 from datetime import date
@@ -56,8 +57,12 @@ def _format_csv_row(row: dict) -> list:
     ]
 
 
-def _build_csv() -> str:
-    """Build CSV of recent job_signals (capped at 5K rows for email attachment). Returns CSV string."""
+def _build_csv_bytes() -> bytes:
+    """Build CSV as bytes (UTF-8 with BOM for Excel). Streams in batches to minimize peak memory."""
+    buf = io.BytesIO()
+    wrapper = io.TextIOWrapper(buf, encoding="utf-8-sig", newline="")
+    writer = csv.writer(wrapper)
+    writer.writerow(CSV_HEADERS)
     with get_cursor() as cur:
         cur.execute(
             """
@@ -74,14 +79,14 @@ def _build_csv() -> str:
             LIMIT 5000
             """
         )
-        rows = cur.fetchall()
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(CSV_HEADERS)
-    for row in rows:
-        writer.writerow(_format_csv_row(row))
-    return output.getvalue()
+        while True:
+            batch = cur.fetchmany(500)
+            if not batch:
+                break
+            for row in batch:
+                writer.writerow(_format_csv_row(row))
+    wrapper.flush()
+    return buf.getvalue()
 
 
 def send_signal_report(recipients: list[str], run_summary: dict | None = None) -> bool:
@@ -98,13 +103,13 @@ def send_signal_report(recipients: list[str], run_summary: dict | None = None) -
         return False
 
     try:
-        csv_content = _build_csv()
-        csv_b64 = base64.b64encode(csv_content.encode()).decode()
+        csv_bytes = _build_csv_bytes()
+        csv_b64 = base64.b64encode(csv_bytes).decode()
         filename = f"hiring-signals-{date.today().isoformat()}.csv"
 
         summary = run_summary or {}
-        jobs_added = summary.get("jobs_added", "N/A")
-        high_priority = summary.get("high_priority", "N/A")
+        jobs_added = html.escape(str(summary.get("jobs_added", "N/A")))
+        high_priority = html.escape(str(summary.get("high_priority", "N/A")))
 
         from_addr = os.environ.get("RESEND_FROM", "Signals <signals@resend.dev>")
 
@@ -119,7 +124,7 @@ def send_signal_report(recipients: list[str], run_summary: dict | None = None) -
               <p>Full dataset attached as CSV.</p>
               <hr>
               <p style="color:#888;font-size:12px;">
-                Sent by Hiring Signal Tracker · Powered by Growleads
+                Sent by Hiring Signal Tracker &middot; Powered by Growleads
               </p>
             """,
             "attachments": [{"filename": filename, "content": csv_b64}],

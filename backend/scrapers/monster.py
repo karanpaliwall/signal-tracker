@@ -1,7 +1,7 @@
 import os
 import re
 import hashlib
-from typing import Optional
+from urllib.parse import quote_plus
 from apify_client import ApifyClient
 from backend.scrapers.base import BaseJobScraper
 import backend.log_buffer as lb
@@ -28,7 +28,6 @@ class MonsterScraper(BaseJobScraper):
             client = ApifyClient(os.environ["APIFY_TOKEN"])
             try:
                 lb.log("monster", f"Scraping: {keyword} (limit: {max_items})")
-                from urllib.parse import quote_plus
                 search_url = f"https://www.monster.com/jobs/search?q={quote_plus(keyword)}&where=United+States"
                 run = client.actor(ACTOR_ID).call(run_input={
                     "startUrls": [{"url": search_url}],
@@ -43,7 +42,7 @@ class MonsterScraper(BaseJobScraper):
 
         return self._run_keywords_parallel(keywords, scrape_one)
 
-    def _normalize(self, raw: dict) -> Optional[dict]:
+    def _normalize(self, raw: dict) -> dict | None:
         posting = raw.get("jobPosting") or {}
 
         job_title = (

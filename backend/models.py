@@ -26,6 +26,7 @@ class SourcesConfig(BaseModel):
     glassdoor_keywords: list[str] = []
     monster_keywords: list[str] = []
     naukri_keywords: list[str] = []
+    custom_scrapers: list[dict] = []
 
 
 class DeleteSignalsRequest(BaseModel):

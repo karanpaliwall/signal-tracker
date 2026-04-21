@@ -1,28 +1,46 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import apiFetch from '../lib/apiFetch'
 
 const TABS = [
   { id: 'scrapers',     label: 'Scrapers' },
   { id: 'intelligence', label: 'Intelligence' },
 ]
+const LIMIT = 50
 
 export default function RunLog() {
-  const [runs, setRuns]     = useState([])
+  const [runs, setRuns]       = useState([])
+  const [total, setTotal]     = useState(0)
+  const [offset, setOffset]   = useState(0)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab]       = useState('scrapers')
+  const [tab, setTab]         = useState('scrapers')
+  const hasRunningRef         = useRef(false)
+  const offsetRef             = useRef(0)
+
+  useEffect(() => { offsetRef.current = offset }, [offset])
+  useEffect(() => { hasRunningRef.current = runs.some(r => r.status === 'running') }, [runs])
 
   useEffect(() => {
-    load()
-    const iv = setInterval(() => load(false), 5000)
+    load(true, 0)
+    const iv = setInterval(() => {
+      if (hasRunningRef.current) load(false, offsetRef.current)
+    }, 5000)
     return () => clearInterval(iv)
   }, [])
 
-  async function load(showSpinner = true) {
+  async function load(showSpinner = true, curOffset = 0) {
     if (showSpinner) setLoading(true)
     try {
-      const r = await fetch('/api/scrape/runs?limit=50')
-      setRuns(await r.json())
+      const r = await apiFetch(`/api/scrape/runs?limit=${LIMIT}&offset=${curOffset}`)
+      const d = await r.json()
+      setRuns(d.results || [])
+      setTotal(d.total || 0)
     } catch (e) { console.error(e) }
     setLoading(false)
+  }
+
+  function goPage(newOffset) {
+    setOffset(newOffset)
+    load(true, newOffset)
   }
 
   function timeAgo(dateStr) {
@@ -49,10 +67,11 @@ export default function RunLog() {
     return run.status === 'running'
   }
 
-  // Scrapers = platform-based runs; Intelligence = classify runs
-  const scraperRuns = runs.filter(r => r.mode !== 'intelligence')
+  const scraperRuns      = runs.filter(r => r.mode !== 'intelligence')
   const intelligenceRuns = runs.filter(r => r.mode === 'intelligence')
-  const displayRuns = tab === 'scrapers' ? scraperRuns : intelligenceRuns
+  const displayRuns      = tab === 'scrapers' ? scraperRuns : intelligenceRuns
+  const totalPages       = Math.ceil(total / LIMIT)
+  const currentPage      = Math.floor(offset / LIMIT) + 1
 
   return (
     <div>
@@ -63,7 +82,7 @@ export default function RunLog() {
             <h1 className="page-title">Run Log</h1>
             <p className="page-subtitle">History of all pipeline executions</p>
           </div>
-          <button className="btn btn-secondary" onClick={load}>↻ Refresh</button>
+          <button className="btn btn-secondary" onClick={() => load()}>↻ Refresh</button>
         </div>
       </div>
 
@@ -97,6 +116,15 @@ export default function RunLog() {
             )}
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16, alignItems: 'center' }}>
+            <button className="btn btn-secondary" disabled={offset <= 0} onClick={() => goPage(Math.max(0, offset - LIMIT))}>← Prev</button>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Page {currentPage} of {totalPages}</span>
+            <button className="btn btn-secondary" disabled={offset + LIMIT >= total} onClick={() => goPage(offset + LIMIT)}>Next →</button>
+          </div>
+        )}
       </div>
     </div>
   )

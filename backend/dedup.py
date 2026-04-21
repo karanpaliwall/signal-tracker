@@ -30,7 +30,7 @@ def run_dedup() -> int:
             FROM job_signals
             WHERE is_duplicate = FALSE
               AND company_name IS NOT NULL
-              AND scraped_at >= NOW() - INTERVAL '30 days'
+              AND scraped_at >= NOW() - INTERVAL '90 days'
             ORDER BY scraped_at ASC
             """
         )
@@ -45,7 +45,7 @@ def run_dedup() -> int:
         company = (rec["company_name"] or "").lower().strip()
         title = (rec["job_title_raw"] or "").lower().strip()
         url = (rec["job_url"] or "").strip()
-        key = f"{company}|{title}"
+        key = title  # company is already the bucket key — no need to prefix
 
         bucket = buckets[company]
         is_dup = any(

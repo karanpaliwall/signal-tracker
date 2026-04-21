@@ -46,8 +46,8 @@ def compute_priority(company_jobs: list[dict]) -> tuple[str, float]:
     if sales_count >= 2:
         score += _SCORE_SALES_CLUSTER
 
-    # Recency bonus — any role posted today
-    today = date.today()
+    # Recency bonus — any role posted today (UTC)
+    today = datetime.now(timezone.utc).date()
     if any(j.get("posted_date") == today for j in company_jobs):
         score += _SCORE_RECENCY_TODAY
 
@@ -107,7 +107,7 @@ def rebuild_company_signals() -> int:
     for row in rows:
         companies[row["company_name"]].append(dict(row))
 
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     cutoff = today - timedelta(days=7)
 
     # Build all upsert rows in Python first (no DB per iteration)
@@ -149,9 +149,20 @@ def rebuild_company_signals() -> int:
               overall_priority      = EXCLUDED.overall_priority,
               signal_strength_score = EXCLUDED.signal_strength_score,
               role_velocity_7d      = EXCLUDED.role_velocity_7d,
-              last_updated_at       = NOW()
+              last_updated_at       = NOW(),
+              first_seen_at         = COALESCE(company_signals.first_seen_at, NOW())
             """,
             upsert_rows,
+        )
+
+        # Propagate company-level priority back to individual job signals
+        cur.execute(
+            """
+            UPDATE job_signals SET priority = cs.overall_priority
+            FROM company_signals cs
+            WHERE job_signals.company_name = cs.company_name
+              AND job_signals.is_duplicate = FALSE
+            """
         )
 
     updated = len(upsert_rows)

@@ -1,6 +1,6 @@
 import os
 import hashlib
-from typing import Optional
+from urllib.parse import quote_plus
 from apify_client import ApifyClient
 from backend.scrapers.base import BaseJobScraper
 import backend.log_buffer as lb
@@ -24,7 +24,6 @@ class IndeedScraper(BaseJobScraper):
             client = ApifyClient(os.environ["APIFY_TOKEN"])
             try:
                 lb.log("indeed", f"Scraping: {keyword} (limit: {max_items})")
-                from urllib.parse import quote_plus
                 search_url = f"https://www.indeed.com/jobs?q={quote_plus(keyword)}&l=United+States&sort=date"
                 run = client.actor(ACTOR_ID).call(run_input={
                     "startUrls": [{"url": search_url}],
@@ -39,7 +38,7 @@ class IndeedScraper(BaseJobScraper):
 
         return self._run_keywords_parallel(keywords, scrape_one)
 
-    def _normalize(self, raw: dict) -> Optional[dict]:
+    def _normalize(self, raw: dict) -> dict | None:
         job_title = (raw.get("positionName") or raw.get("title") or raw.get("jobTitle") or "").strip()
         company   = (raw.get("company") or raw.get("companyName") or "").strip()
         if not job_title or not company:

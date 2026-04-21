@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
+import psycopg2.extras
 from anthropic import Anthropic, RateLimitError
 
 from backend.database import get_cursor
@@ -106,7 +107,7 @@ def _classify(job_title: str, snippet: str = "") -> dict:
                 "department": dept,
                 "seniority": seniority,
                 "intent_signal": str(data.get("intent_signal", "Unknown signal"))[:100],
-                "confidence": float(data.get("confidence", 0.5)),
+                "confidence": max(0.0, min(1.0, float(data.get("confidence", 0.5)))),
             }
         except json.JSONDecodeError as e:
             # Parse failure is deterministic — retrying the same prompt gives the same broken output.
@@ -130,46 +131,12 @@ def _classify(job_title: str, snippet: str = "") -> dict:
     }
 
 
-def _process_record(record: dict) -> bool:
-    """Classify one job signal record and write results to DB in a single UPDATE. Returns True on success."""
-    job_id = record["id"]
-    job_title = record.get("job_title_raw") or ""
-    snippet = record.get("description_snippet") or ""
-
-    result = _classify(job_title, snippet)
-
-    # Single UPDATE: increment attempt counter AND write classification results together.
-    with get_cursor() as cur:
-        cur.execute(
-            """
-            UPDATE job_signals SET
-              processing_attempts  = processing_attempts + 1,
-              job_title_normalized = %s,
-              department           = %s,
-              seniority            = %s,
-              intent_signal        = %s,
-              confidence           = %s
-            WHERE id = %s
-            """,
-            (
-                job_title,  # sentinel value — indicates classified (Haiku doesn't alter the title)
-                result["department"],
-                result["seniority"],
-                result["intent_signal"],
-                result["confidence"],
-                job_id,
-            ),
-        )
-    return True
-
-
 def run_intelligence() -> dict:
     """
     Classify all unclassified job_signals (WHERE job_title_normalized IS NULL AND processing_attempts < 5).
-    Uses ThreadPoolExecutor(max_workers=4) — each thread owns its own Anthropic client.
+    Uses ThreadPoolExecutor(max_workers=4) for parallel API calls, then one batch UPDATE for all results.
     Returns summary dict.
     """
-    # Fetch pending records
     with get_cursor() as cur:
         cur.execute(
             """
@@ -190,28 +157,56 @@ def run_intelligence() -> dict:
 
     lb.log("intelligence", f"Classifying {total} records with Claude Haiku...")
 
-    processed = 0
+    classified = []  # (id_str, title, dept, seniority, intent, confidence)
     failed = 0
 
-    def _worker(record: dict) -> bool:
+    def _worker(record: dict) -> tuple | None:
         if lb.should_stop("intelligence"):
-            return False
+            return None
+        job_title = record.get("job_title_raw") or ""
+        snippet = record.get("description_snippet") or ""
         try:
-            result = _process_record(record)
-            return result
+            result = _classify(job_title, snippet)
+            return (
+                str(record["id"]), job_title,
+                result["department"], result["seniority"],
+                result["intent_signal"], result["confidence"],
+            )
         except Exception as e:
-            lb.log("intelligence", f"Failed: {record.get('job_title_raw')}: {e}", "warning")
-            return False
+            lb.log("intelligence", f"Failed: {job_title}: {e}", "warning")
+            return None
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {executor.submit(_worker, r): r for r in pending}
-        for i, future in enumerate(as_completed(futures), 1):
-            if future.result():
-                processed += 1
+        for future in as_completed(futures):
+            row = future.result()
+            if row:
+                classified.append(row)
+                if len(classified) % 25 == 0:
+                    lb.log("intelligence", f"Progress: {len(classified)}/{total} classified")
             else:
                 failed += 1
-            if processed % 25 == 0 and processed > 0:
-                lb.log("intelligence", f"Progress: {processed}/{total} classified")
+
+    processed = len(classified)
+
+    # Single batch UPDATE — one DB roundtrip regardless of record count
+    if classified:
+        with get_cursor() as cur:
+            psycopg2.extras.execute_values(
+                cur,
+                """
+                UPDATE job_signals AS js SET
+                    processing_attempts  = js.processing_attempts + 1,
+                    job_title_normalized = v.title,
+                    department           = v.dept,
+                    seniority            = v.sen,
+                    intent_signal        = v.intent,
+                    confidence           = v.conf::double precision
+                FROM (VALUES %s) AS v(id, title, dept, sen, intent, conf)
+                WHERE js.id = v.id::uuid
+                """,
+                classified,
+            )
 
     lb.log("intelligence", f"Classification complete: {processed} processed, {failed} failed")
     return {"pending": total, "processed": processed, "failed": failed}

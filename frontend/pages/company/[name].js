@@ -2,14 +2,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import PriorityBadge from '../../components/PriorityBadge'
 import DeptBar from '../../components/DeptBar'
-
-const PLATFORM_LABEL = {
-  linkedin:  'LinkedIn',
-  indeed:    'Indeed',
-  glassdoor: 'Glassdoor',
-  monster:   'Monster',
-  naukri:    'Naukri',
-}
+import apiFetch from '../../lib/apiFetch'
+import { PLATFORM_LABEL } from '../../lib/platforms'
 
 const SENIORITY_COLOR = {
   'c-suite':  '#f59e0b',
@@ -30,7 +24,7 @@ export default function CompanyDetail() {
   useEffect(() => {
     if (!name) return
     setLoading(true)
-    fetch(`/api/companies/${encodeURIComponent(name)}`)
+    apiFetch(`/api/companies/${encodeURIComponent(name)}`)
       .then(r => {
         if (!r.ok) throw new Error('Not found')
         return r.json()
@@ -130,7 +124,7 @@ export default function CompanyDetail() {
               <thead>
                 <tr style={{ background: 'var(--bg-card)' }}>
                   {['Job Title', 'Department', 'Seniority', 'Intent Signal', 'Platform', 'Location', 'Posted'].map(h => (
-                    <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>
+                    <th key={h} scope="col" style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>
                       {h}
                     </th>
                   ))}

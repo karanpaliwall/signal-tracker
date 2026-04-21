@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import PriorityBadge from '../components/PriorityBadge'
 import Toast from '../components/Toast'
 import { useStatus } from './_app'
+import apiFetch from '../lib/apiFetch'
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
@@ -34,8 +35,8 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const [statsRes, signalsRes] = await Promise.all([
-        fetch('/api/signals/stats'),
-        fetch('/api/signals?page_size=10'),
+        apiFetch('/api/signals/stats'),
+        apiFetch('/api/signals?page_size=10'),
       ])
       setStats(await statsRes.json())
       const sig = await signalsRes.json()
@@ -48,7 +49,7 @@ export default function Dashboard() {
 
   async function handleRun(mode) {
     try {
-      const r = await fetch(`/api/scrape/run?mode=${mode}`, { method: 'POST' })
+      const r = await apiFetch(`/api/scrape/run?mode=${mode}`, { method: 'POST' })
       if (r.ok) {
         setToast('Run started')
       } else {
@@ -59,7 +60,7 @@ export default function Dashboard() {
   }
 
   async function handleStop() {
-    await fetch('/api/scrape/stop', { method: 'POST' })
+    await apiFetch('/api/scrape/stop', { method: 'POST' })
     setToast('Stop requested')
   }
 

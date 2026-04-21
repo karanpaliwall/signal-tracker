@@ -1,14 +1,17 @@
 import csv
 import io
 import os
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date
+from uuid import UUID
 
 import psycopg2.extras
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security.api_key import APIKeyHeader
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -30,18 +33,24 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 # ── Rate Limiting ─────────────────────────────────────────────────────────
 
-limiter = Limiter(key_func=get_remote_address)
+def _rate_key(request: Request) -> str:
+    api_key = request.headers.get("X-API-Key")
+    if api_key:
+        return f"key:{api_key[:64]}"
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=_rate_key)
 
 # ── Auth ─────────────────────────────────────────────────────────────────
 
-_API_KEY = os.environ.get("API_KEY", "")
+_API_KEY = os.environ.get("API_KEY", "").strip()
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def verify_key(key: str | None = Security(_api_key_header)) -> None:
     if not _API_KEY:
         return  # dev mode — open access
-    if key != _API_KEY:
+    if key is None or not secrets.compare_digest(key, _API_KEY):
         raise HTTPException(status_code=403, detail="Invalid API key")
 
 
@@ -50,6 +59,9 @@ def verify_key(key: str | None = Security(_api_key_header)) -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     if not _API_KEY:
+        railway_env = os.environ.get("RAILWAY_ENVIRONMENT")
+        if railway_env:
+            raise RuntimeError("API_KEY must be set in production. Add it to Railway environment variables.")
         lb.log("startup", "WARNING: API_KEY is not set — all endpoints are open. Set API_KEY in production.", "warning")
 
     scheduler.startup()
@@ -68,6 +80,18 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type", "X-API-Key"],
 )
+
+
+class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+app.add_middleware(_SecurityHeadersMiddleware)
 
 
 # ── Health ────────────────────────────────────────────────────────────────
@@ -121,20 +145,25 @@ def scrape_log(request: Request, since: int = Query(0)) -> dict:
 
 
 @app.get("/api/scrape/runs", dependencies=[Depends(verify_key)])
-def scrape_runs(limit: int = Query(20, le=100)) -> list:
+def scrape_runs(
+    limit: int = Query(20, le=100),
+    offset: int = Query(0, ge=0),
+) -> dict:
     with get_cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS cnt FROM signal_scraper_runs")
+        total = cur.fetchone()["cnt"]
         cur.execute(
             """
             SELECT id, platform, mode, started_at, completed_at, status,
                    jobs_found, jobs_added, duplicates_caught, error_message
             FROM signal_scraper_runs
             ORDER BY started_at DESC
-            LIMIT %s
+            LIMIT %s OFFSET %s
             """,
-            (limit,),
+            (limit, offset),
         )
         rows = cur.fetchall()
-    return [dict(r) for r in rows]
+    return {"total": total, "results": [dict(r) for r in rows]}
 
 
 # ── Signals ───────────────────────────────────────────────────────────────
@@ -176,11 +205,19 @@ def get_signals(
     priority: str | None = Query(None),
     data_mode: str | None = Query(None),
     search: str | None = Query(None),
+    sort_by: str = Query("scraped_at"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
 ) -> dict:
     where, params = _build_signals_filters(platform, department, priority, data_mode, search)
     offset = (page - 1) * page_size
+    order_map = {
+        "scraped_at":  "scraped_at DESC",
+        "posted_date": "posted_date DESC NULLS LAST",
+        "confidence":  "confidence DESC NULLS LAST",
+        "priority":    "priority ASC, scraped_at DESC",
+    }
+    order = order_map.get(sort_by, "scraped_at DESC")
 
     with get_cursor() as cur:
         cur.execute(f"SELECT COUNT(*) AS cnt FROM job_signals WHERE {where}", params)
@@ -194,7 +231,7 @@ def get_signals(
                    posted_date, scraped_at, data_mode
             FROM job_signals
             WHERE {where}
-            ORDER BY scraped_at DESC
+            ORDER BY {order}
             LIMIT %s OFFSET %s
             """,
             params + [page_size, offset],
@@ -207,6 +244,27 @@ def get_signals(
         "page_size": page_size,
         "results": [dict(r) for r in rows],
     }
+
+
+@app.get("/api/signals/{signal_id}", dependencies=[Depends(verify_key)])
+def get_signal(signal_id: UUID) -> dict:
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, job_id, company_name, job_title_raw,
+                   department, seniority, intent_signal, priority, confidence,
+                   platform, location, job_url, description_snippet,
+                   posted_date, scraped_at, data_mode, is_duplicate,
+                   processing_attempts, created_at
+            FROM job_signals
+            WHERE id = %s
+            """,
+            (str(signal_id),),
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    return dict(row)
 
 
 @app.get("/api/signals/stats", dependencies=[Depends(verify_key)])
@@ -296,6 +354,7 @@ def delete_signals(body: DeleteSignalsRequest) -> dict:
 def get_companies(
     priority: str | None = Query(None),
     sort_by: str = Query("score"),
+    search: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
 ) -> dict:
@@ -305,6 +364,9 @@ def get_companies(
     if priority:
         filters.append("overall_priority = %s")
         params.append(priority)
+    if search:
+        filters.append("company_name ILIKE %s")
+        params.append(f"%{search}%")
 
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
@@ -340,6 +402,18 @@ def get_companies(
         "page_size": page_size,
         "results": [dict(r) for r in rows],
     }
+
+
+@app.delete("/api/companies/{company_name}", dependencies=[Depends(verify_key)])
+def delete_company(company_name: str) -> dict:
+    with get_cursor() as cur:
+        cur.execute(
+            "DELETE FROM company_signals WHERE company_name = %s",
+            (company_name,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Company not found")
+    return {"deleted": True, "company_name": company_name}
 
 
 @app.get("/api/companies/{company_name}", dependencies=[Depends(verify_key)])
@@ -415,11 +489,13 @@ def get_sources() -> dict:
         "glassdoor_keywords":    keywords.get("glassdoor", []),
         "monster_keywords":      keywords.get("monster", []),
         "naukri_keywords":       keywords.get("naukri", []),
+        "custom_scrapers":       sources.get("custom_scrapers", []),
     }
 
 
 @app.post("/api/sources", dependencies=[Depends(verify_key)])
-def save_sources(body: SourcesConfig) -> dict:
+@limiter.limit("20/minute")
+def save_sources(request: Request, body: SourcesConfig) -> dict:
     sources_val = psycopg2.extras.Json({
         "linkedin_enabled":     body.linkedin_enabled,
         "indeed_enabled":       body.indeed_enabled,
@@ -427,6 +503,7 @@ def save_sources(body: SourcesConfig) -> dict:
         "monster_enabled":      body.monster_enabled,
         "naukri_enabled":       body.naukri_enabled,
         "results_per_keyword":  body.results_per_keyword,
+        "custom_scrapers":      body.custom_scrapers,
     })
     keywords_val = psycopg2.extras.Json({
         "linkedin":     body.linkedin_keywords,
@@ -456,7 +533,8 @@ def get_scheduler() -> dict:
 
 
 @app.post("/api/scheduler", dependencies=[Depends(verify_key)])
-def update_scheduler(body: SchedulerConfig) -> dict:
+@limiter.limit("20/minute")
+def update_scheduler(request: Request, body: SchedulerConfig) -> dict:
     state = {
         "enabled": body.enabled,
         "hour": body.hour,
@@ -475,7 +553,8 @@ def get_notify() -> dict:
 
 
 @app.post("/api/notify/config", dependencies=[Depends(verify_key)])
-def save_notify(body: NotifyConfig) -> dict:
+@limiter.limit("20/minute")
+def save_notify(request: Request, body: NotifyConfig) -> dict:
     notifier.save_notify_config(body.enabled, [str(r) for r in body.recipients])
     return {"saved": True}
 

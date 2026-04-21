@@ -212,6 +212,9 @@ Job Boards ──► Scrapers ──► Normalization ──► Dedup ──► 
 23. **`scrape_runs` returns `{total, results}`** — `GET /api/scrape/runs` returns a paginated object, not a bare list. Frontend `run-log.js` reads `d.results || []` and `d.total || 0`. Pass `limit` and `offset` query params.
 24. **`apiFetch` wrapper for all frontend API calls** — `frontend/lib/apiFetch.js` injects `X-API-Key: NEXT_PUBLIC_API_KEY` when the env var is set. All pages import `apiFetch` instead of `fetch` directly for API calls.
 25. **Shared platform constants** — `frontend/lib/platforms.js` exports `PLATFORMS` (full objects), `PLATFORM_KEYS` (string array), and `PLATFORM_LABEL` (key→label map). Import from here; do not re-declare in individual pages.
+26. **Literal API routes must come before parameterized ones** — `/api/signals/stats` and `/api/signals/export` must be registered BEFORE `/api/signals/{signal_id}`. FastAPI matches in registration order; if `/{signal_id}` comes first, `"stats"` and `"export"` are parsed as UUID values → 422 error. Stats cards on the dashboard will show blank if this order is wrong.
+27. **`_safe_date()` handles relative date strings** — Indeed returns `"15 days ago"`, Monster returns `"Today"` / `"11 days ago"`, Glassdoor returns `"4d"` / `"24h"`. `_safe_date()` in `backend/scrapers/base.py` resolves all these patterns to real `date` objects using regex + `timedelta`. Do not remove this logic; without it `posted_date` is NULL for all Apify platforms.
+28. **Native `<select>` dropdowns need `color-scheme: dark`** — without it the browser renders the option popup in the OS light theme (white background, black text) regardless of the page's dark CSS. Set `color-scheme: dark` on `.form-select` and add `.form-select option { background: #161929; color: #e2e4f0 }` as a fallback. Applies to all filter dropdowns on Signals, Companies, and Sources pages.
 
 ---
 

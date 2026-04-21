@@ -307,7 +307,11 @@ export default function Signals() {
                               <span className={`badge badge-${s.platform}`}>{s.platform}</span>
                             </td>
                             <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                              {s.posted_date ? s.posted_date.slice(0, 10) : '—'}
+                              {s.posted_date
+                                ? s.posted_date.slice(0, 10)
+                                : s.scraped_at
+                                  ? '~' + s.scraped_at.slice(0, 10)
+                                  : '—'}
                             </td>
                           </tr>
                           {expanded === s.id && (

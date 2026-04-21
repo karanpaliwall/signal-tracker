@@ -168,7 +168,9 @@ export default function CompanyDetail() {
                     </td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 12 }}>{role.location || '—'}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontSize: 12 }}>
-                      {role.posted_date ? new Date(role.posted_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      {(role.posted_date || role.scraped_at)
+                        ? new Date(role.posted_date || role.scraped_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—'}
                     </td>
                   </tr>
                 ))}

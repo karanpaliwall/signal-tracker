@@ -165,4 +165,4 @@ class BaseJobScraper(ABC):
         try:
             return dp.parse(str(value)).date()
         except Exception:
-            return None
+            return today

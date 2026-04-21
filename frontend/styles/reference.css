@@ -534,6 +534,12 @@ tbody tr:last-child td { border-bottom: none; }
   font-family: inherit;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   outline: none;
+  color-scheme: dark;
+}
+
+.form-select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 .form-input:focus,

@@ -49,6 +49,12 @@
   background-position: right 10px center;
   padding-right: 30px;
   cursor: pointer;
+  color-scheme: dark;
+}
+
+.form-select option {
+  background: #161929;
+  color: #e2e4f0;
 }
 
 /* ── Live Log Panel (fixed bottom, visible across all pages) ── */

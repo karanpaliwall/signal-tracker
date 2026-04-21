@@ -1,9 +1,10 @@
 import os
+import re
 import json
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import psycopg2
 import psycopg2.extras
@@ -127,13 +128,40 @@ class BaseJobScraper(ABC):
         return results
 
     def _safe_date(self, value) -> date | None:
-        """Parse various date formats into a date object."""
         if not value:
             return None
         if isinstance(value, date):
             return value
         if isinstance(value, datetime):
             return value.date()
+        s = str(value).strip().lower()
+        today = date.today()
+        # "today" / "just posted" / "today's date"
+        if s in ("today", "just posted", "new", "active"):
+            return today
+        # "yesterday"
+        if s == "yesterday":
+            return today - timedelta(days=1)
+        # "Xh" or "X hours ago"
+        m = re.match(r'^(\d+)\s*h(?:ours?)?(?:\s+ago)?$', s)
+        if m:
+            return today
+        # "Xd" or "X days ago"
+        m = re.match(r'^(\d+)\s*d(?:ays?)?(?:\s+ago)?$', s)
+        if m:
+            return today - timedelta(days=int(m.group(1)))
+        # "X weeks ago"
+        m = re.match(r'^(\d+)\s*w(?:eeks?)?(?:\s+ago)?$', s)
+        if m:
+            return today - timedelta(weeks=int(m.group(1)))
+        # "X months ago"
+        m = re.match(r'^(\d+)\s*mo(?:nths?)?(?:\s+ago)?$', s)
+        if m:
+            return today - timedelta(days=int(m.group(1)) * 30)
+        # "30+ days ago" / "30+ days"
+        m = re.match(r'^(\d+)\+?\s*d(?:ays?)?', s)
+        if m:
+            return today - timedelta(days=int(m.group(1)))
         try:
             return dp.parse(str(value)).date()
         except Exception:

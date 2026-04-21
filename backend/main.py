@@ -11,7 +11,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security.api_key import APIKeyHeader
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -246,27 +246,6 @@ def get_signals(
     }
 
 
-@app.get("/api/signals/{signal_id}", dependencies=[Depends(verify_key)])
-def get_signal(signal_id: UUID) -> dict:
-    with get_cursor() as cur:
-        cur.execute(
-            """
-            SELECT id, job_id, company_name, job_title_raw,
-                   department, seniority, intent_signal, priority, confidence,
-                   platform, location, job_url, description_snippet,
-                   posted_date, scraped_at, data_mode, is_duplicate,
-                   processing_attempts, created_at
-            FROM job_signals
-            WHERE id = %s
-            """,
-            (str(signal_id),),
-        )
-        row = cur.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Signal not found")
-    return dict(row)
-
-
 @app.get("/api/signals/stats", dependencies=[Depends(verify_key)])
 def signals_stats() -> dict:
     with get_cursor() as cur:
@@ -337,6 +316,27 @@ def signals_export(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.get("/api/signals/{signal_id}", dependencies=[Depends(verify_key)])
+def get_signal(signal_id: UUID) -> dict:
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, job_id, company_name, job_title_raw,
+                   department, seniority, intent_signal, priority, confidence,
+                   platform, location, job_url, description_snippet,
+                   posted_date, scraped_at, data_mode, is_duplicate,
+                   processing_attempts, created_at
+            FROM job_signals
+            WHERE id = %s
+            """,
+            (str(signal_id),),
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    return dict(row)
 
 
 @app.delete("/api/signals", dependencies=[Depends(verify_key)])

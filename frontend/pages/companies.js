@@ -48,8 +48,14 @@ export default function Companies() {
       <div className="page-body">
         {/* Filter Bar */}
         <div className="filter-bar">
+          <span className="filter-bar-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+            Filter
+          </span>
           <select
-            className="form-select"
+            className={`form-select${priority ? ' has-value' : ''}`}
             style={{ width: 'auto' }}
             value={priority}
             onChange={e => setPriority(e.target.value)}
@@ -60,15 +66,18 @@ export default function Companies() {
             <option value="low">Low Priority</option>
           </select>
 
+          <div className="filter-divider" />
+
+          <span className="filter-bar-label">Sort</span>
           <select
-            className="form-select"
+            className={`form-select${sortBy !== 'score' ? ' has-value' : ''}`}
             style={{ width: 'auto' }}
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}
           >
-            <option value="score">Sort: Signal Score</option>
-            <option value="role_count">Sort: Role Count</option>
-            <option value="recent">Sort: Most Recent</option>
+            <option value="score">Signal Score</option>
+            <option value="role_count">Role Count</option>
+            <option value="recent">Most Recent</option>
           </select>
         </div>
 
@@ -108,7 +117,7 @@ function CompanyCard({ company: c }) {
   const router = useRouter()
   return (
     <div
-      className="card"
+      className="card company-card"
       style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, cursor: 'pointer' }}
       onClick={() => router.push(`/company/${encodeURIComponent(c.company_name)}`)}
     >

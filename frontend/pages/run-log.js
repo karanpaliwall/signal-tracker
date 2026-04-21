@@ -25,6 +25,19 @@ export default function RunLog() {
     setLoading(false)
   }
 
+  function timeAgo(dateStr) {
+    if (!dateStr) return '—'
+    const diff = Date.now() - new Date(dateStr)
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1)  return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24)  return `${hrs}h ago`
+    const days = Math.floor(hrs / 24)
+    if (days < 7)  return `${days}d ago`
+    return new Date(dateStr).toLocaleDateString()
+  }
+
   function duration(run) {
     if (!run.started_at || !run.completed_at) return '—'
     const secs = Math.round((new Date(run.completed_at) - new Date(run.started_at)) / 1000)
@@ -78,9 +91,9 @@ export default function RunLog() {
                 <p>No {tab} runs yet.</p>
               </div>
             ) : tab === 'scrapers' ? (
-              <ScrapersTable runs={displayRuns} duration={duration} isRunning={isRunning} />
+              <ScrapersTable runs={displayRuns} duration={duration} isRunning={isRunning} timeAgo={timeAgo} />
             ) : (
-              <IntelligenceTable runs={displayRuns} duration={duration} isRunning={isRunning} />
+              <IntelligenceTable runs={displayRuns} duration={duration} isRunning={isRunning} timeAgo={timeAgo} />
             )}
           </div>
         </div>
@@ -89,7 +102,7 @@ export default function RunLog() {
   )
 }
 
-function ScrapersTable({ runs, duration, isRunning }) {
+function ScrapersTable({ runs, duration, isRunning, timeAgo }) {
   return (
     <table>
       <thead>
@@ -120,13 +133,18 @@ function ScrapersTable({ runs, duration, isRunning }) {
                 {run.mode}
               </span>
             </td>
-            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-              {run.started_at ? new Date(run.started_at).toLocaleString() : '—'}
+            <td style={{ fontSize: 12 }}>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{timeAgo(run.started_at)}</span>
+              {run.started_at && (
+                <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 1 }}>
+                  {new Date(run.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
             </td>
             <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
               {isRunning(run) ? (
                 <span style={{ color: 'var(--green-400)' }}>Running…</span>
-              ) : run.completed_at ? new Date(run.completed_at).toLocaleString() : '—'}
+              ) : run.completed_at ? new Date(run.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
             </td>
             <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {isRunning(run) ? <span className="dot dot-green" /> : duration(run)}
@@ -147,7 +165,7 @@ function ScrapersTable({ runs, duration, isRunning }) {
   )
 }
 
-function IntelligenceTable({ runs, duration, isRunning }) {
+function IntelligenceTable({ runs, duration, isRunning, timeAgo }) {
   return (
     <table>
       <thead>
@@ -167,13 +185,18 @@ function IntelligenceTable({ runs, duration, isRunning }) {
         {runs.map((run, idx) => (
           <tr key={run.id}>
             <td style={{ color: 'var(--text-muted)', fontSize: 11 }}>{idx + 1}</td>
-            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-              {run.started_at ? new Date(run.started_at).toLocaleString() : '—'}
+            <td style={{ fontSize: 12 }}>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{timeAgo(run.started_at)}</span>
+              {run.started_at && (
+                <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 1 }}>
+                  {new Date(run.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
             </td>
             <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
               {isRunning(run) ? (
                 <span style={{ color: 'var(--green-400)' }}>Running…</span>
-              ) : run.completed_at ? new Date(run.completed_at).toLocaleString() : '—'}
+              ) : run.completed_at ? new Date(run.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
             </td>
             <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {isRunning(run) ? <span className="dot dot-green" /> : duration(run)}

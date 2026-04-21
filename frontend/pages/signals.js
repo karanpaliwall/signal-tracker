@@ -117,7 +117,6 @@ export default function Signals() {
 
   return (
     <div>
-      {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">
           <div>
@@ -130,7 +129,14 @@ export default function Signals() {
                 Delete {selected.size}
               </button>
             )}
-            <button className="btn btn-secondary" onClick={handleExport}>↓ Export CSV</button>
+            <button className="btn btn-secondary" onClick={handleExport}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Export CSV
+            </button>
           </div>
         </div>
       </div>
@@ -138,6 +144,15 @@ export default function Signals() {
       <div className="page-body">
         {/* Filter Bar */}
         <div className="filter-bar">
+          <span className="filter-bar-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+            Filters
+          </span>
+
+          <div className="filter-divider" />
+
           <div className="tabs-pill">
             {[['', 'All'], ['live', 'Present'], ['weekly', 'Weekly']].map(([val, label]) => (
               <button
@@ -149,19 +164,19 @@ export default function Signals() {
           </div>
 
           <select
-            className="form-select"
+            className={`form-select${filters.platform ? ' has-value' : ''}`}
             style={{ width: 'auto' }}
             value={filters.platform}
             onChange={e => handleFilter('platform', e.target.value)}
           >
             <option value="">All Platforms</option>
             {PLATFORMS.map(p => (
-              <option key={p} value={p} style={{ textTransform: 'capitalize' }}>{p}</option>
+              <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
             ))}
           </select>
 
           <select
-            className="form-select"
+            className={`form-select${filters.department ? ' has-value' : ''}`}
             style={{ width: 'auto' }}
             value={filters.department}
             onChange={e => handleFilter('department', e.target.value)}
@@ -171,7 +186,7 @@ export default function Signals() {
           </select>
 
           <select
-            className="form-select"
+            className={`form-select${filters.priority ? ' has-value' : ''}`}
             style={{ width: 'auto' }}
             value={filters.priority}
             onChange={e => handleFilter('priority', e.target.value)}
@@ -196,16 +211,19 @@ export default function Signals() {
           />
 
           {anyActive && (
-            <button className="btn btn-ghost" onClick={clearFilters}>Clear</button>
+            <button className="btn btn-ghost" onClick={clearFilters} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+              Clear
+            </button>
           )}
         </div>
 
         {/* Table */}
         <div className="card">
           <div className="table-wrap">
-            {loading ? (
-              <p style={{ padding: '20px 16px', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</p>
-            ) : signals.length === 0 ? (
+            {signals.length === 0 && !loading ? (
               <div className="empty-state">
                 <p>No signals found. {anyActive ? 'Try clearing your filters.' : 'Run the pipeline to start collecting data.'}</p>
               </div>
@@ -233,83 +251,119 @@ export default function Signals() {
                   </tr>
                 </thead>
                 <tbody>
-                  {signals.map((s, idx) => (
-                    <React.Fragment key={s.id}>
-                      <tr
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-                      >
-                        <td onClick={e => { e.stopPropagation(); toggleSelect(s.id) }}>
-                          <input
-                            type="checkbox"
-                            checked={selected.has(s.id)}
-                            onChange={() => toggleSelect(s.id)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                          {(page - 1) * PAGE_SIZE + idx + 1}
-                        </td>
-                        <td style={{ fontWeight: 600 }}>{s.company_name}</td>
-                        <td style={{ maxWidth: 220 }}>{s.job_title_raw}</td>
-                        <td>
-                          {s.department && (
-                            <span className="badge badge-blue" style={{ fontSize: 11 }}>{s.department}</span>
-                          )}
-                        </td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{s.seniority || '—'}</td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: 12, maxWidth: 200 }}>
-                          {s.intent_signal || '—'}
-                        </td>
-                        <td><PriorityBadge priority={s.priority} /></td>
-                        <td>
-                          <span className={`badge badge-${s.platform}`}>
-                            {s.platform}
-                          </span>
-                        </td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                          {s.posted_date ? s.posted_date.slice(0, 10) : '—'}
-                        </td>
-                      </tr>
-                      {expanded === s.id && (
-                        <tr>
-                          <td colSpan={10} style={{ background: 'var(--bg-hover)', padding: '12px 16px' }}>
-                            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                              {s.description_snippet || 'No description available.'}
-                            </p>
-                            {s.job_url && /^https?:\/\//.test(s.job_url) && (
-                              <a
-                                href={s.job_url} target="_blank" rel="noreferrer"
-                                style={{ color: 'var(--blue-400)', fontSize: 12 }}
-                                onClick={e => e.stopPropagation()}
-                              >
-                                View on {s.platform} →
-                              </a>
-                            )}
-                          </td>
+                  {loading
+                    ? [...Array(8)].map((_, i) => (
+                        <tr key={i}>
+                          <td><span className="skeleton" style={{ width: 14, height: 14 }} /></td>
+                          <td><span className="skeleton" style={{ width: 20 }} /></td>
+                          <td><span className="skeleton" style={{ width: 110 }} /></td>
+                          <td><span className="skeleton" style={{ width: 165 }} /></td>
+                          <td><span className="skeleton" style={{ width: 70, height: 20, borderRadius: 9999 }} /></td>
+                          <td><span className="skeleton" style={{ width: 55 }} /></td>
+                          <td><span className="skeleton" style={{ width: 140 }} /></td>
+                          <td><span className="skeleton" style={{ width: 58, height: 20, borderRadius: 9999 }} /></td>
+                          <td><span className="skeleton" style={{ width: 68, height: 20, borderRadius: 9999 }} /></td>
+                          <td><span className="skeleton" style={{ width: 60 }} /></td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
+                      ))
+                    : signals.map((s, idx) => (
+                        <React.Fragment key={s.id}>
+                          <tr
+                            className={selected.has(s.id) ? 'row-selected' : ''}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => setExpanded(expanded === s.id ? null : s.id)}
+                          >
+                            <td onClick={e => { e.stopPropagation(); toggleSelect(s.id) }}>
+                              <input
+                                type="checkbox"
+                                checked={selected.has(s.id)}
+                                onChange={() => toggleSelect(s.id)}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                              {(page - 1) * PAGE_SIZE + idx + 1}
+                            </td>
+                            <td style={{ fontWeight: 600 }}>{s.company_name}</td>
+                            <td style={{ maxWidth: 220 }}>{s.job_title_raw}</td>
+                            <td>
+                              {s.department && (
+                                <span className="badge badge-blue" style={{ fontSize: 11 }}>{s.department}</span>
+                              )}
+                            </td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{s.seniority || '—'}</td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 12, maxWidth: 200 }}>
+                              {s.intent_signal || '—'}
+                            </td>
+                            <td><PriorityBadge priority={s.priority} /></td>
+                            <td>
+                              <span className={`badge badge-${s.platform}`}>{s.platform}</span>
+                            </td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                              {s.posted_date ? s.posted_date.slice(0, 10) : '—'}
+                            </td>
+                          </tr>
+                          {expanded === s.id && (
+                            <tr>
+                              <td colSpan={10} style={{ padding: 0 }}>
+                                <div className="signal-detail-inner">
+                                  <p className="signal-detail-desc">
+                                    {s.description_snippet || 'No description available.'}
+                                  </p>
+                                  {s.job_url && /^https?:\/\//.test(s.job_url) && (
+                                    <a
+                                      href={s.job_url} target="_blank" rel="noreferrer"
+                                      className="btn btn-secondary"
+                                      style={{ fontSize: 12, textDecoration: 'none', height: 30, padding: '0 12px', flexShrink: 0 }}
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      View on {s.platform} →
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))
+                  }
                 </tbody>
               </table>
             )}
           </div>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16, alignItems: 'center' }}>
-            <button className="btn btn-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Page {page} of {totalPages}
-            </span>
-            <button className="btn btn-secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
-          </div>
-        )}
+        {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPage={setPage} />}
       </div>
 
       <Toast message={toast} onClose={() => setToast('')} />
+    </div>
+  )
+}
+
+function Pagination({ page, totalPages, onPage }) {
+  const items = []
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) items.push(i)
+  } else {
+    const near = new Set([1, totalPages, page - 1, page, page + 1].filter(p => p >= 1 && p <= totalPages))
+    const sorted = [...near].sort((a, b) => a - b)
+    let prev = 0
+    for (const p of sorted) {
+      if (p - prev > 1) items.push('…')
+      items.push(p)
+      prev = p
+    }
+  }
+  return (
+    <div className="pagination">
+      <button className="page-btn" disabled={page <= 1} onClick={() => onPage(page - 1)}>←</button>
+      {items.map((p, i) =>
+        p === '…'
+          ? <span key={`d${i}`} className="page-dots">…</span>
+          : <button key={p} className={`page-btn${p === page ? ' active' : ''}`} onClick={() => onPage(p)}>{p}</button>
+      )}
+      <button className="page-btn" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>→</button>
     </div>
   )
 }

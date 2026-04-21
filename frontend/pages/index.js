@@ -88,10 +88,18 @@ export default function Dashboard() {
       <div className="page-body">
         {/* Stats Grid */}
         <div className="stat-grid">
-          <StatCard label="Total Signals" value={stats?.total ?? '—'} detail="all time" />
-          <StatCard label="High Priority" value={stats?.high_priority ?? '—'} detail="needs attention" accent="var(--red-400)" />
-          <StatCard label="New Today" value={stats?.new_today ?? '—'} detail="since midnight" accent="var(--green-400)" />
-          <StatCard label="Companies" value={stats?.companies_tracked ?? '—'} detail="tracked" />
+          <StatCard label="Total Signals" value={stats?.total ?? '—'} detail="all time"
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}
+          />
+          <StatCard label="High Priority" value={stats?.high_priority ?? '—'} detail="needs attention" accent="var(--red-400)"
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
+          />
+          <StatCard label="New Today" value={stats?.new_today ?? '—'} detail="since midnight" accent="var(--green-400)"
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>}
+          />
+          <StatCard label="Companies" value={stats?.companies_tracked ?? '—'} detail="tracked"
+            icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="1"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>}
+          />
         </div>
 
         {/* Pipeline Status */}
@@ -170,9 +178,17 @@ export default function Dashboard() {
   )
 }
 
-function StatCard({ label, value, accent, detail }) {
+function StatCard({ label, value, accent, detail, icon }) {
   return (
-    <div className="stat-card">
+    <div className="stat-card" style={{ borderTop: `2px solid ${accent || 'var(--border-color)'}` }}>
+      {icon && (
+        <div className="stat-icon" style={{
+          background: accent ? `${accent}1a` : 'var(--bg-hover)',
+          color: accent || 'var(--text-muted)',
+        }}>
+          {icon}
+        </div>
+      )}
       <div className="stat-label">{label}</div>
       <div className="stat-value" style={accent ? { color: accent } : {}}>{value}</div>
       {detail && <div className="stat-detail">{detail}</div>}

@@ -289,6 +289,134 @@ a.sidebar-item {
   gap: 24px;
 }
 
+/* ── Active filter state on selects ── */
+.form-select.has-value {
+  border-color: rgba(59, 130, 246, 0.45);
+  background-color: rgba(37, 99, 235, 0.07);
+  color: var(--blue-400);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2360a5fa' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+.form-select:focus {
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  outline: none;
+}
+
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-hover) 25%, #1e2338 50%, var(--bg-hover) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  display: inline-block;
+  height: 12px;
+}
+
+/* ── Selected table row ── */
+tbody tr.row-selected { background: rgba(37, 99, 235, 0.07) !important; }
+tbody tr.row-selected:hover { background: rgba(37, 99, 235, 0.11) !important; }
+
+/* ── Signal expanded detail row ── */
+.signal-detail-inner {
+  padding: 14px 16px 14px 20px;
+  background: rgba(8, 10, 22, 0.55);
+  border-left: 3px solid var(--blue-600);
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-color);
+}
+.signal-detail-desc {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ── Company card hover lift ── */
+.company-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+}
+.company-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* ── Pagination ── */
+.pagination {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 20px;
+  align-items: center;
+}
+.page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.page-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.page-btn.active { background: var(--blue-600); color: white; border-color: var(--blue-600); }
+.page-dots { font-size: 12px; color: var(--text-muted); padding: 0 2px; user-select: none; }
+
+/* ── Filter bar label ── */
+.filter-bar-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Filter divider ── */
+.filter-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+  flex-shrink: 0;
+}
+
+/* ── Stat card icon ── */
+.stat-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
 /* ── Responsive additions ── */
 @media (max-width: 768px) {
   /* Sidebar is hidden — remove left margin and shrink padding */

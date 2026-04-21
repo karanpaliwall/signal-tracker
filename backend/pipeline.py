@@ -19,7 +19,6 @@ _lock = threading.Lock()
 # Running state — protected by _lock
 _state = {
     "live_running": False,
-    "weekly_running": False,
     "intelligence_running": False,
 }
 
@@ -41,32 +40,31 @@ def _load_keywords(platform: str) -> list[str]:
                 return kw
     except Exception as e:
         lb.log("pipeline", f"Failed to load keywords for {platform}, using defaults: {e}", "warning")
-    # Fallback to defaults
+    # Fallback to scraper defaults
+    import importlib
     defaults = {
-        "linkedin":     "backend.scrapers.linkedin",
-        "indeed":       "backend.scrapers.indeed",
-        "glassdoor":    "backend.scrapers.glassdoor",
-        "ziprecruiter": "backend.scrapers.ziprecruiter",
-        "monster":      "backend.scrapers.monster",
-        "naukri":       "backend.scrapers.naukri",
+        "linkedin":  "backend.scrapers.linkedin",
+        "indeed":    "backend.scrapers.indeed",
+        "glassdoor": "backend.scrapers.glassdoor",
+        "monster":   "backend.scrapers.monster",
+        "naukri":    "backend.scrapers.naukri",
     }
     module_path = defaults.get(platform, "backend.scrapers.linkedin")
-    import importlib
     mod = importlib.import_module(module_path)
     return mod.DEFAULT_KEYWORDS
 
 
 def _load_results_per_keyword() -> int:
-    """Load results_per_keyword from app_config. Defaults to 50."""
+    """Load results_per_keyword from app_config. Defaults to 25."""
     try:
         with get_cursor() as cur:
             cur.execute("SELECT value FROM app_config WHERE key = 'sources'")
             row = cur.fetchone()
         if row and row["value"]:
-            return int(row["value"].get("results_per_keyword", 50))
+            return int(row["value"].get("results_per_keyword", 25))
     except Exception:
         pass
-    return 50
+    return 25
 
 
 def _load_enabled_platforms() -> dict:
@@ -81,8 +79,7 @@ def _load_enabled_platforms() -> dict:
         lb.log("pipeline", f"Failed to load platform config: {e}", "warning")
     return {
         "linkedin_enabled": True, "indeed_enabled": True,
-        "glassdoor_enabled": False, "ziprecruiter_enabled": False,
-        "monster_enabled": False, "naukri_enabled": False,
+        "glassdoor_enabled": False, "monster_enabled": False, "naukri_enabled": False,
     }
 
 
@@ -122,35 +119,32 @@ def _finish_run_record(
         )
 
 
-def _run_pipeline(mode: str = "live") -> None:
+def _run_pipeline() -> None:
     """
     Full pipeline: scrape all enabled platforms → dedup → classify → score → notify.
-    Runs in a background thread.
+    Runs in a background thread. Always uses live mode (24h window).
     """
-    flag = "live" if mode == "live" else "weekly"
-    lb.log("pipeline", f"=== Run started ({mode} mode) ===")
+    lb.log("pipeline", "=== Live run started ===")
 
     total_added = 0
     platforms = _load_enabled_platforms()
     max_items = _load_results_per_keyword()
 
-    lb.log("pipeline", f"Results per keyword: {max_items} (daily) / {min(max_items * 3, 1000)} (weekly)")
+    lb.log("pipeline", f"Results per keyword: {max_items}")
 
-    # All platforms in order: core + optional
     ALL_PLATFORMS = [
-        ("linkedin_enabled",     "linkedin",     LinkedInScraper),
-        ("indeed_enabled",       "indeed",       IndeedScraper),
-        ("glassdoor_enabled",    "glassdoor",    GlassdoorScraper),
-        ("monster_enabled",      "monster",      MonsterScraper),
-        ("naukri_enabled",       "naukri",       NaukriScraper),
+        ("linkedin_enabled",  "linkedin",  LinkedInScraper),
+        ("indeed_enabled",    "indeed",    IndeedScraper),
+        ("glassdoor_enabled", "glassdoor", GlassdoorScraper),
+        ("monster_enabled",   "monster",   MonsterScraper),
+        ("naukri_enabled",    "naukri",    NaukriScraper),
     ]
-    # Core platforms default to True; optional platforms default to False
     DEFAULTS = {"linkedin_enabled": True, "indeed_enabled": True}
 
     try:
         # ── Step 1: Scraping ────────────────────────────────────────────
         for config_key, platform_name, ScraperClass in ALL_PLATFORMS:
-            if lb.should_stop(flag):
+            if lb.should_stop("live"):
                 lb.log("pipeline", f"Stopped before {platform_name}")
                 return
             default = DEFAULTS.get(config_key, False)
@@ -158,8 +152,8 @@ def _run_pipeline(mode: str = "live") -> None:
                 keywords = _load_keywords(platform_name)
                 run_id = None
                 try:
-                    run_id = _create_run_record(platform_name, mode)
-                    found, added = ScraperClass().run(keywords, mode, max_items)
+                    run_id = _create_run_record(platform_name, "live")
+                    found, added = ScraperClass().run(keywords, "live", max_items)
                     _finish_run_record(run_id, "completed", jobs_found=found, jobs_added=added)
                     total_added += added
                 except Exception as e:
@@ -169,7 +163,7 @@ def _run_pipeline(mode: str = "live") -> None:
 
         # ── Step 2: Dedup ───────────────────────────────────────────────
         lb.log("pipeline", "Running deduplication...")
-        dups_caught = dedup.run_dedup()
+        dedup.run_dedup()
 
         # ── Step 3: Intelligence (classify) ────────────────────────────
         lb.log("pipeline", "Running Claude Haiku classification...")
@@ -191,7 +185,7 @@ def _run_pipeline(mode: str = "live") -> None:
             with _lock:
                 _state["intelligence_running"] = False
 
-        if lb.should_stop(flag):
+        if lb.should_stop("live"):
             lb.log("pipeline", "Stopped after intelligence")
             return
 
@@ -223,57 +217,23 @@ def _run_pipeline(mode: str = "live") -> None:
         lb.log("pipeline", f"Pipeline error: {e}", "error")
     finally:
         with _lock:
-            _state[f"{flag}_running"] = False
-        lb.clear_stop(flag)
-
-
-def _run_full_pipeline() -> None:
-    """
-    Run live mode then weekly mode back-to-back in a single background thread.
-    live_running is set to True by trigger_run before this thread starts.
-    """
-    _run_pipeline("live")  # clears live_running in its own finally block
-
-    if lb.should_stop("weekly"):
-        lb.log("pipeline", "Full run stopped before weekly phase")
-        lb.clear_stop("weekly")
-        return
-
-    with _lock:
-        _state["weekly_running"] = True
-    _run_pipeline("weekly")  # clears weekly_running in its own finally block
+            _state["live_running"] = False
+        lb.clear_stop("live")
 
 
 def trigger_run(mode: str = "live") -> bool:
     """
-    Trigger a pipeline run in a background thread.
+    Trigger a live pipeline run in a background thread.
     Returns False if a run is already in progress.
     TOCTOU-safe: acquire lock, check flag, set flag, THEN start thread.
-    mode="full" runs live then weekly back-to-back.
     """
-    if mode == "full":
-        with _lock:
-            if _state["live_running"] or _state["weekly_running"]:
-                return False
-            _state["live_running"] = True
-        lb.clear_stop("live")
-        lb.clear_stop("weekly")
-        t = threading.Thread(target=_run_full_pipeline, daemon=True)
-        t.start()
-        return True
-
-    if mode not in ("live", "weekly"):
-        mode = "live"
-    flag = f"{mode}_running"
-
     with _lock:
-        if _state.get(flag):
+        if _state["live_running"]:
             return False
-        _state[flag] = True
+        _state["live_running"] = True
 
     lb.clear_stop("live")
-    lb.clear_stop("weekly")
-    t = threading.Thread(target=_run_pipeline, args=(mode,), daemon=True)
+    t = threading.Thread(target=_run_pipeline, daemon=True)
     t.start()
     return True
 
@@ -281,17 +241,15 @@ def trigger_run(mode: str = "live") -> bool:
 def stop_run() -> None:
     """Request stop for any in-progress pipeline run."""
     lb.request_stop("live")
-    lb.request_stop("weekly")
     lb.log("pipeline", "Stop requested")
 
 
 def trigger_intelligence_only() -> bool:
     """
     Run only the classification step (no scraping). Returns False if already running.
-    Also blocked when a full pipeline run is active (which includes its own intelligence step).
     """
     with _lock:
-        if _state["live_running"] or _state["weekly_running"] or _state["intelligence_running"]:
+        if _state["live_running"] or _state["intelligence_running"]:
             return False
         _state["intelligence_running"] = True
 

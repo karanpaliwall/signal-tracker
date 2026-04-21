@@ -7,7 +7,7 @@ _lock = threading.Lock()
 _write_pos: int = 0  # monotonic absolute counter — never decrements
 
 # Stop flags — checked by pipeline, intelligence, and scheduler loops to cancel mid-run
-_stop_flags: dict[str, bool] = {"live": False, "weekly": False, "intelligence": False}
+_stop_flags: dict[str, bool] = {"live": False, "intelligence": False}
 
 
 def log(source: str, msg: str, level: str = "info") -> None:

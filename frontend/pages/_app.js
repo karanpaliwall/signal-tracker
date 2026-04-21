@@ -9,14 +9,14 @@ import Head from 'next/head'
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 
 // Pipeline status context — shared across Layout and Dashboard to avoid duplicate polling.
-export const StatusContext = createContext({ live_running: false, weekly_running: false, intelligence_running: false })
+export const StatusContext = createContext({ live_running: false, intelligence_running: false })
 
 export function useStatus() {
   return useContext(StatusContext)
 }
 
 export default function App({ Component, pageProps }) {
-  const [status, setStatus] = useState({ live_running: false, weekly_running: false, intelligence_running: false })
+  const [status, setStatus] = useState({ live_running: false, intelligence_running: false })
 
   useEffect(() => {
     const check = () => {

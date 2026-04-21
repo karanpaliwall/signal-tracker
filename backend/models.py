@@ -20,7 +20,7 @@ class SourcesConfig(BaseModel):
     glassdoor_enabled: bool = False
     monster_enabled: bool = False
     naukri_enabled: bool = False
-    results_per_keyword: int = Field(default=50, ge=1, le=1000)
+    results_per_keyword: int = Field(default=25, ge=1, le=1000)
     linkedin_keywords: list[str] = []
     indeed_keywords: list[str] = []
     glassdoor_keywords: list[str] = []

@@ -43,7 +43,7 @@ class LinkedInScraper(BaseJobScraper):
         tpr = "r86400" if mode == "live" else "r604800"
 
         def scrape_one(keyword):
-            if lb.should_stop("live") or lb.should_stop("weekly"):
+            if lb.should_stop("live"):
                 return []
             try:
                 lb.log("linkedin", f"Scraping: {keyword} (limit: {max_items})")
@@ -52,7 +52,7 @@ class LinkedInScraper(BaseJobScraper):
                 batch = min(max_items, 25)
 
                 while len(items) < max_items:
-                    if lb.should_stop("live") or lb.should_stop("weekly"):
+                    if lb.should_stop("live"):
                         break
                     url = _GUEST_API.format(
                         keywords=quote_plus(keyword),

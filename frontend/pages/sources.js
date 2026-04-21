@@ -65,7 +65,7 @@ const SECTION_INFO = {
       <p>Scrapers are the engines that fetch job listings from job boards. Each scraper searches its platform using the keywords you define below, then the results flow through deduplication, AI classification, and scoring before appearing in your dashboard.</p>
       <p style={{ marginTop: 8 }}>Platform notes:</p>
       <ul style={{ marginTop: 4, paddingLeft: 18, lineHeight: 1.7 }}>
-        <li><strong>LinkedIn</strong> — free guest API, no account needed. Fetches last 24h (live) or last 7 days (weekly).</li>
+        <li><strong>LinkedIn</strong> — free guest API, no account needed. Fetches jobs posted in the last 24 hours.</li>
         <li><strong>Indeed</strong> — Apify actor, US listings sorted by date. Best general coverage.</li>
         <li><strong>Glassdoor</strong> — Apify actor, returns 60–130 results per keyword regardless of limit setting.</li>
         <li><strong>Monster</strong> — Apify actor, low cost per result. Good US coverage.</li>
@@ -75,8 +75,8 @@ const SECTION_INFO = {
   ),
   schedule: (
     <>
-      <p>When enabled, the pipeline runs automatically once per day at the time you set (IST). Each scheduled run performs a <strong>live scrape</strong> (jobs from the last 24 hours) followed by a <strong>weekly scan</strong> (last 7 days), then classifies all new records with AI and updates company scores.</p>
-      <p style={{ marginTop: 8 }}>You can also trigger runs manually any time from the Dashboard using the Run Live or Run Weekly buttons.</p>
+      <p>When enabled, the pipeline runs automatically once per day at the time you set (IST). Each scheduled run scrapes the last 24 hours of job listings, then classifies all new records with AI and updates company scores.</p>
+      <p style={{ marginTop: 8 }}>You can also trigger a run manually any time from the Dashboard using the Run button.</p>
     </>
   ),
   notifications: (
@@ -309,12 +309,10 @@ export default function Sources() {
               type="number" min="10" max="1000" step="10"
               className="form-input"
               style={{ width: 80 }}
-              value={config.results_per_keyword ?? 50}
-              onChange={e => setConfig(c => ({ ...c, results_per_keyword: Math.min(1000, Math.max(10, +e.target.value || 10)) }))}
+              value={config.results_per_keyword ?? 25}
+              onChange={e => setConfig(c => ({ ...c, results_per_keyword: Math.min(1000, Math.max(1, +e.target.value || 1)) }))}
             />
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              daily · weekly uses {Math.min((config.results_per_keyword || 50) * 3, 1000)}
-            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>results per keyword per run</span>
           </div>
 
           {/* Keyword editors */}

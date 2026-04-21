@@ -31,12 +31,9 @@ class BaseJobScraper(ABC):
         max_items: results per keyword (daily). Weekly gets 3× automatically.
         Returns (jobs_found, jobs_added).
         """
-        # Weekly runs get 3× depth since they cover a 7-day window
-        effective_limit = min(max_items * 3, 1000) if mode == "weekly" else max_items
+        lb.log(self.platform, f"Starting live scrape ({len(keywords)} keywords, {max_items} results/keyword)...")
 
-        lb.log(self.platform, f"Starting {mode} scrape ({len(keywords)} keywords, {effective_limit} results/keyword)...")
-
-        raw_records = self.scrape_live(keywords, mode, effective_limit)
+        raw_records = self.scrape_live(keywords, mode, max_items)
         lb.log(self.platform, f"Apify returned {len(raw_records)} raw records")
 
         normalized = []
@@ -44,7 +41,7 @@ class BaseJobScraper(ABC):
             try:
                 n = self._normalize(r)
                 if n:
-                    n["data_mode"] = "live" if mode == "live" else "weekly"
+                    n["data_mode"] = "live"
                     normalized.append(n)
             except Exception as e:
                 lb.log(self.platform, f"Normalize error: {e}", "warning")

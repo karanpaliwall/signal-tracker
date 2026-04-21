@@ -1,5 +1,5 @@
 """
-APScheduler — daily "present" run + weekly Monday 9am IST digest.
+APScheduler — daily live run, scheduled time configurable via Sources & Config.
 State persisted in Postgres app_config table (not JSON files — Railway-safe).
 """
 import psycopg2.extras
@@ -15,7 +15,6 @@ import backend.log_buffer as lb
 
 IST = pytz.timezone("Asia/Kolkata")
 
-# Single scheduler instance — created once during startup.
 _scheduler: BackgroundScheduler | None = None
 
 
@@ -55,51 +54,37 @@ def save_state(state: dict) -> None:
         )
 
 
-# ── Job wrappers ──────────────────────────────────────────────────────────
+# ── Job wrapper ───────────────────────────────────────────────────────────
 
-def _run_present() -> None:
-    lb.log("scheduler", "Scheduled present run triggered")
+def _run_live() -> None:
+    lb.log("scheduler", "Scheduled live run triggered")
     pipeline.trigger_run("live")
-
-
-def _run_weekly() -> None:
-    lb.log("scheduler", "Scheduled weekly run triggered")
-    pipeline.trigger_run("weekly")
 
 
 # ── Public API ────────────────────────────────────────────────────────────
 
 def apply_state(state: dict) -> None:
     """
-    Apply scheduler state — add/remove jobs based on enabled flag and config.
+    Apply scheduler state — add/remove the daily live run job.
     Safe to call multiple times (uses replace_existing=True).
     """
     sched = _get_scheduler()
 
-    # Weekly digest is always scheduled (Monday 9am IST)
-    sched.add_job(
-        _run_weekly,
-        CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=IST),
-        id="weekly_digest",
-        replace_existing=True,
-    )
-
     if state.get("enabled"):
         hour = int(state.get("hour", 9))
         minute = int(state.get("minute", 0))
-
         sched.add_job(
-            _run_present,
+            _run_live,
             CronTrigger(hour=hour, minute=minute, timezone=IST),
-            id="present_daily",
+            id="live_daily",
             replace_existing=True,
         )
-        lb.log("scheduler", f"Daily present run scheduled at {hour:02d}:{minute:02d} IST")
+        lb.log("scheduler", f"Daily live run scheduled at {hour:02d}:{minute:02d} IST")
     else:
         try:
-            sched.remove_job("present_daily")
+            sched.remove_job("live_daily")
         except JobLookupError:
-            pass  # job doesn't exist — that's fine
+            pass
         lb.log("scheduler", "Scheduler disabled — daily run removed")
 
 
@@ -121,13 +106,9 @@ def shutdown() -> None:
 
 
 def get_next_runs() -> dict:
-    """Return next scheduled run times for both jobs."""
+    """Return next scheduled run time for the daily live job."""
     sched = _get_scheduler()
-    result = {}
-    for job_id in ("present_daily", "weekly_digest"):
-        job = sched.get_job(job_id)
-        if job and job.next_run_time:
-            result[job_id] = job.next_run_time.isoformat()
-        else:
-            result[job_id] = None
-    return result
+    job = sched.get_job("live_daily")
+    return {
+        "live_daily": job.next_run_time.isoformat() if job and job.next_run_time else None
+    }

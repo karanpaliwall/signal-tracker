@@ -87,7 +87,7 @@ def get_meta() -> dict:
         "seniorities": sorted(intelligence.VALID_SENIORITIES),
         "platforms": ["linkedin", "indeed", "glassdoor", "monster", "naukri"],
         "priorities": ["high", "medium", "low"],
-        "data_modes": ["live", "weekly"],
+        "data_modes": ["live"],
     }
 
 
@@ -95,11 +95,11 @@ def get_meta() -> dict:
 
 @app.post("/api/scrape/run", dependencies=[Depends(verify_key)])
 @limiter.limit("10/minute")
-def scrape_run(request: Request, mode: str = Query("full", pattern="^(live|weekly|full)$")) -> dict:
-    ok = pipeline.trigger_run(mode)
+def scrape_run(request: Request, mode: str = Query("live", pattern="^live$")) -> dict:
+    ok = pipeline.trigger_run()
     if not ok:
         raise HTTPException(status_code=409, detail="A run is already in progress")
-    return {"started": True, "mode": mode}
+    return {"started": True, "mode": "live"}
 
 
 @app.post("/api/scrape/stop", dependencies=[Depends(verify_key)])
@@ -409,7 +409,7 @@ def get_sources() -> dict:
         "glassdoor_enabled":    sources.get("glassdoor_enabled", False),
         "monster_enabled":      sources.get("monster_enabled", False),
         "naukri_enabled":       sources.get("naukri_enabled", False),
-        "results_per_keyword":  sources.get("results_per_keyword", 50),
+        "results_per_keyword":  sources.get("results_per_keyword", 25),
         "linkedin_keywords":     keywords.get("linkedin", []),
         "indeed_keywords":       keywords.get("indeed", []),
         "glassdoor_keywords":    keywords.get("glassdoor", []),

@@ -12,7 +12,7 @@ export default function Dashboard() {
 
   // Status comes from shared context — no duplicate polling
   const status = useStatus()
-  const isRunning = status.live_running || status.weekly_running || status.intelligence_running
+  const isRunning = status.live_running || status.intelligence_running
   const wasRunning = useRef(false)
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function Dashboard() {
     try {
       const r = await fetch(`/api/scrape/run?mode=${mode}`, { method: 'POST' })
       if (r.ok) {
-        setToast(`${mode === 'live' ? 'Live' : 'Weekly'} run started`)
+        setToast('Run started')
       } else {
         const d = await r.json()
         setToast(d.detail || 'Already running')
@@ -76,10 +76,7 @@ export default function Dashboard() {
             {isRunning ? (
               <button className="btn btn-danger" onClick={handleStop}>Stop</button>
             ) : (
-              <>
-                <button className="btn btn-secondary" onClick={() => handleRun('live')}>Run Live</button>
-                <button className="btn btn-primary" onClick={() => handleRun('weekly')}>Run Weekly</button>
-              </>
+              <button className="btn btn-primary" onClick={() => handleRun('live')}>Run</button>
             )}
           </div>
         </div>
@@ -117,14 +114,14 @@ export default function Dashboard() {
                 animation: isRunning ? 'pulse-dot 1.4s ease-in-out infinite' : 'none',
               }} />
               <span style={{ fontSize: 12, color: isRunning ? 'var(--green-400)' : 'var(--amber-400)', fontWeight: 500 }}>
-                {status.live_running ? 'Scraping…' : status.weekly_running ? 'Weekly scan…' : status.intelligence_running ? 'Classifying…' : 'Idle'}
+                {status.live_running ? 'Scraping…' : status.intelligence_running ? 'Classifying…' : 'Idle'}
               </span>
             </span>
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {isRunning
               ? 'Scraping job listings and classifying signals…'
-              : 'No active run. Click Run Live (24h window) or Run Weekly (7-day window).'}
+              : 'No active run. Click Run to scrape the last 24 hours of job listings.'}
           </p>
         </div>
 

@@ -25,7 +25,7 @@ const NAV = [
 export default function Layout({ children }) {
   const router = useRouter()
   const status = useStatus()
-  const isRunning = status.live_running || status.weekly_running || status.intelligence_running
+  const isRunning = status.live_running || status.intelligence_running
   const [navOpen, setNavOpen] = useState(false)
 
   useEffect(() => { setNavOpen(false) }, [router.pathname])

@@ -20,7 +20,7 @@ class NaukriScraper(BaseJobScraper):
 
     def scrape_live(self, keywords: list[str], mode: str = "live", max_items: int = 50) -> list[dict]:
         def scrape_one(keyword):
-            if lb.should_stop("live") or lb.should_stop("weekly"):
+            if lb.should_stop("live"):
                 return []
             client = ApifyClient(os.environ["APIFY_TOKEN"])
             try:

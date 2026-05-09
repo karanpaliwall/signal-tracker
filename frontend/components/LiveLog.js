@@ -69,7 +69,7 @@ export default function LiveLog({ isRunning }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {scrolledUp && expanded && (
             <span
-              onClick={e => { e.stopPropagation(); setScrolledUp(false); bodyRef.current.scrollTop = bodyRef.current.scrollHeight }}
+              onClick={e => { e.stopPropagation(); if (bodyRef.current) { setScrolledUp(false); bodyRef.current.scrollTop = bodyRef.current.scrollHeight } }}
               style={{ color: 'var(--blue-400)', fontSize: 11, cursor: 'pointer' }}
             >↓ scroll to bottom</span>
           )}

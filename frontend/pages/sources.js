@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Toast from '../components/Toast'
 import apiFetch from '../lib/apiFetch'
 import { PLATFORMS } from '../lib/platforms'
@@ -99,8 +99,10 @@ export default function Sources() {
   const [saving, setSaving]             = useState(false)
   const [loadError, setLoadError]       = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const savedTimer                      = useRef(null)
 
   useEffect(() => { loadAll() }, [])
+  useEffect(() => () => clearTimeout(savedTimer.current), [])
 
   async function loadAll() {
     try {
@@ -150,7 +152,7 @@ export default function Sources() {
       if (!r1.ok || !r2.ok || !r3.ok) throw new Error('Save failed')
       setSaved(true)
       setToast('Configuration saved')
-      setTimeout(() => setSaved(false), 2000)
+      savedTimer.current = setTimeout(() => setSaved(false), 2000)
     } catch { setToast('Error saving') }
     setSaving(false)
   }

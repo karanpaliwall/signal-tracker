@@ -2,7 +2,20 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import PriorityBadge from '../components/PriorityBadge'
 import DeptBar from '../components/DeptBar'
+import Select from '../components/Select'
 import apiFetch from '../lib/apiFetch'
+
+const PRIORITY_OPTS = [
+  { value: '', label: 'All Priorities' },
+  { value: 'high', label: 'High Priority' },
+  { value: 'medium', label: 'Medium Priority' },
+  { value: 'low', label: 'Low Priority' },
+]
+const SORT_OPTS = [
+  { value: 'score', label: 'Signal Score' },
+  { value: 'role_count', label: 'Role Count' },
+  { value: 'recent', label: 'Most Recent' },
+]
 
 export default function Companies() {
   const [companies, setCompanies] = useState([])
@@ -29,8 +42,11 @@ export default function Companies() {
       setCompanies(d.results || [])
       setTotal(d.total || 0)
     } catch (e) { console.error(e) }
-    setLoading(false)
+    finally { setLoading(false) }
   }, [priority, sortBy, search])
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => () => clearTimeout(searchTimer.current), [])
 
   // When filters change, reset to page 1 and load in one shot (avoids double-fire with stale page)
   useEffect(() => { setPage(1); load(1) }, [load])
@@ -63,31 +79,25 @@ export default function Companies() {
             </svg>
             Filter
           </span>
-          <select
-            className={`form-select${priority ? ' has-value' : ''}`}
-            style={{ width: 'auto' }}
+          <Select
+            options={PRIORITY_OPTS}
             value={priority}
-            onChange={e => setPriority(e.target.value)}
-          >
-            <option value="">All Priorities</option>
-            <option value="high">High Priority</option>
-            <option value="medium">Medium Priority</option>
-            <option value="low">Low Priority</option>
-          </select>
+            onChange={val => setPriority(val)}
+            placeholder="All Priorities"
+            style={{ minWidth: 130 }}
+          />
 
           <div className="filter-divider" />
 
           <span className="filter-bar-label">Sort</span>
-          <select
-            className={`form-select${sortBy !== 'score' ? ' has-value' : ''}`}
-            style={{ width: 'auto' }}
+          <Select
+            options={SORT_OPTS}
             value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-          >
-            <option value="score">Signal Score</option>
-            <option value="role_count">Role Count</option>
-            <option value="recent">Most Recent</option>
-          </select>
+            onChange={val => setSortBy(val)}
+            defaultValue="score"
+            placeholder="Signal Score"
+            style={{ minWidth: 130 }}
+          />
 
           <div className="filter-divider" />
 

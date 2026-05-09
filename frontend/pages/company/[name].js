@@ -23,14 +23,20 @@ export default function CompanyDetail() {
 
   useEffect(() => {
     if (!name) return
+    const controller = new AbortController()
     setLoading(true)
-    apiFetch(`/api/companies/${encodeURIComponent(name)}`)
+    apiFetch(`/api/companies/${encodeURIComponent(name)}`, { signal: controller.signal })
       .then(r => {
         if (!r.ok) throw new Error('Not found')
         return r.json()
       })
       .then(d => { setCompany(d); setLoading(false) })
-      .catch(() => { setError('Company not found'); setLoading(false) })
+      .catch(err => {
+        if (err.name === 'AbortError') return
+        setError('Company not found')
+        setLoading(false)
+      })
+    return () => controller.abort()
   }, [name])
 
   if (loading) return (

@@ -5,6 +5,7 @@ import '../styles/tokens.css'
 import '../styles/reference.css'
 import '../styles/custom.css'
 import Head from 'next/head'
+import apiFetch from '../lib/apiFetch'
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 
@@ -20,7 +21,7 @@ export default function App({ Component, pageProps }) {
 
   useEffect(() => {
     const check = () => {
-      fetch('/api/scrape/status').then(r => r.json()).then(setStatus).catch(() => {})
+      apiFetch('/api/scrape/status').then(r => r.json()).then(setStatus).catch(() => {})
     }
     check()
     const iv = setInterval(check, 5000)

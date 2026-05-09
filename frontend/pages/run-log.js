@@ -20,27 +20,38 @@ export default function RunLog() {
   useEffect(() => { hasRunningRef.current = runs.some(r => r.status === 'running') }, [runs])
 
   useEffect(() => {
-    load(true, 0)
+    load(true, 0, tab)
     const iv = setInterval(() => {
-      if (hasRunningRef.current) load(false, offsetRef.current)
+      if (hasRunningRef.current) load(false, offsetRef.current, tabRef.current)
     }, 5000)
     return () => clearInterval(iv)
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function load(showSpinner = true, curOffset = 0) {
+  const tabRef = useRef(tab)
+  useEffect(() => { tabRef.current = tab }, [tab])
+
+  async function load(showSpinner = true, curOffset = 0, curTab = tab) {
     if (showSpinner) setLoading(true)
+    const modeParam = curTab === 'intelligence' ? 'intelligence' : 'scrapers'
     try {
-      const r = await apiFetch(`/api/scrape/runs?limit=${LIMIT}&offset=${curOffset}`)
+      const r = await apiFetch(`/api/scrape/runs?limit=${LIMIT}&offset=${curOffset}&mode=${modeParam}`)
       const d = await r.json()
       setRuns(d.results || [])
       setTotal(d.total || 0)
     } catch (e) { console.error(e) }
-    setLoading(false)
+    finally { setLoading(false) }
   }
 
   function goPage(newOffset) {
     setOffset(newOffset)
     load(true, newOffset)
+  }
+
+  function switchTab(newTab) {
+    setTab(newTab)
+    setOffset(0)
+    offsetRef.current = 0
+    load(true, 0, newTab)
   }
 
   function timeAgo(dateStr) {
@@ -67,10 +78,8 @@ export default function RunLog() {
     return run.status === 'running'
   }
 
-  const scraperRuns      = runs.filter(r => r.mode !== 'intelligence')
-  const intelligenceRuns = runs.filter(r => r.mode === 'intelligence')
-  const displayRuns      = tab === 'scrapers' ? scraperRuns : intelligenceRuns
-  const totalPages       = Math.ceil(total / LIMIT)
+  const displayRuns = runs
+  const totalPages  = Math.ceil(total / LIMIT)
   const currentPage      = Math.floor(offset / LIMIT) + 1
 
   return (
@@ -93,7 +102,7 @@ export default function RunLog() {
             <button
               key={t.id}
               className={`tab-pill${tab === t.id ? ' active' : ''}`}
-              onClick={() => setTab(t.id)}
+              onClick={() => switchTab(t.id)}
             >
               {t.label}
             </button>

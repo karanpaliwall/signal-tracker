@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import PriorityBadge from '../components/PriorityBadge'
 import Toast from '../components/Toast'
+import Select from '../components/Select'
 import apiFetch from '../lib/apiFetch'
 import { PLATFORM_KEYS } from '../lib/platforms'
 
 const DEPARTMENTS = ['Sales', 'Engineering', 'Marketing', 'Operations', 'Product', 'Finance', 'Other']
 const PLATFORMS   = PLATFORM_KEYS
 const PRIORITIES  = ['high', 'medium', 'low']
+
+const PLATFORM_OPTS  = [{ value: '', label: 'All Platforms' }, ...PLATFORMS.map(p => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))]
+const DEPT_OPTS      = [{ value: '', label: 'All Departments' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))]
+const PRIORITY_OPTS  = [{ value: '', label: 'All Priorities' }, ...PRIORITIES.map(p => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))]
 
 export default function Signals() {
   const [signals, setSignals]   = useState([])
@@ -45,8 +50,11 @@ export default function Signals() {
       setSignals(d.results || [])
       setTotal(d.total || 0)
     } catch (e) { console.error(e) }
-    setLoading(false)
+    finally { setLoading(false) }
   }, [filters])
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => () => clearTimeout(searchTimer.current), [])
 
   useEffect(() => { setPage(1); load(1) }, [filters])
   const pageMounted = useRef(false)
@@ -170,39 +178,29 @@ export default function Signals() {
             ))}
           </div>
 
-          <select
-            className={`form-select${filters.platform ? ' has-value' : ''}`}
-            style={{ width: 'auto' }}
+          <Select
+            options={PLATFORM_OPTS}
             value={filters.platform}
-            onChange={e => handleFilter('platform', e.target.value)}
-          >
-            <option value="">All Platforms</option>
-            {PLATFORMS.map(p => (
-              <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-            ))}
-          </select>
+            onChange={val => handleFilter('platform', val)}
+            placeholder="All Platforms"
+            style={{ minWidth: 130 }}
+          />
 
-          <select
-            className={`form-select${filters.department ? ' has-value' : ''}`}
-            style={{ width: 'auto' }}
+          <Select
+            options={DEPT_OPTS}
             value={filters.department}
-            onChange={e => handleFilter('department', e.target.value)}
-          >
-            <option value="">All Departments</option>
-            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+            onChange={val => handleFilter('department', val)}
+            placeholder="All Departments"
+            style={{ minWidth: 140 }}
+          />
 
-          <select
-            className={`form-select${filters.priority ? ' has-value' : ''}`}
-            style={{ width: 'auto' }}
+          <Select
+            options={PRIORITY_OPTS}
             value={filters.priority}
-            onChange={e => handleFilter('priority', e.target.value)}
-          >
-            <option value="">All Priorities</option>
-            {PRIORITIES.map(p => (
-              <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-            ))}
-          </select>
+            onChange={val => handleFilter('priority', val)}
+            placeholder="All Priorities"
+            style={{ minWidth: 125 }}
+          />
 
           <input
             className="form-input"

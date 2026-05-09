@@ -43,8 +43,9 @@ export default function Dashboard() {
       setSignals(sig.results || [])
     } catch (e) {
       console.error(e)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function handleRun(mode) {
@@ -60,8 +61,10 @@ export default function Dashboard() {
   }
 
   async function handleStop() {
-    await apiFetch('/api/scrape/stop', { method: 'POST' })
-    setToast('Stop requested')
+    try {
+      await apiFetch('/api/scrape/stop', { method: 'POST' })
+      setToast('Stop requested')
+    } catch { setToast('Error stopping pipeline') }
   }
 
   return (

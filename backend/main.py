@@ -148,15 +148,23 @@ def scrape_log(request: Request, since: int = Query(0)) -> dict:
 def scrape_runs(
     limit: int = Query(20, le=100),
     offset: int = Query(0, ge=0),
+    mode: str = Query(None),
 ) -> dict:
+    if mode == "intelligence":
+        where = "WHERE mode = 'intelligence'"
+    elif mode == "scrapers":
+        where = "WHERE mode != 'intelligence'"
+    else:
+        where = ""
     with get_cursor() as cur:
-        cur.execute("SELECT COUNT(*) AS cnt FROM signal_scraper_runs")
+        cur.execute(f"SELECT COUNT(*) AS cnt FROM signal_scraper_runs {where}")
         total = cur.fetchone()["cnt"]
         cur.execute(
-            """
+            f"""
             SELECT id, platform, mode, started_at, completed_at, status,
                    jobs_found, jobs_added, duplicates_caught, error_message
             FROM signal_scraper_runs
+            {where}
             ORDER BY started_at DESC
             LIMIT %s OFFSET %s
             """,

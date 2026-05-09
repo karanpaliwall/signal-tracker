@@ -170,8 +170,9 @@ def _run_pipeline() -> None:
         lb.log("pipeline", "Running Claude Haiku classification...")
         with _lock:
             _state["intelligence_running"] = True
-        intel_run_id = _create_run_record("intelligence", "intelligence")
+        intel_run_id = None
         try:
+            intel_run_id = _create_run_record("intelligence", "intelligence")
             intel_result = intelligence.run_intelligence()
             _finish_run_record(
                 intel_run_id, "completed",
@@ -180,7 +181,8 @@ def _run_pipeline() -> None:
                 duplicates=intel_result.get("failed", 0),
             )
         except Exception as e:
-            _finish_run_record(intel_run_id, "failed", str(e)[:200])
+            if intel_run_id:
+                _finish_run_record(intel_run_id, "failed", str(e)[:200])
             raise
 
         if lb.should_stop("live"):
@@ -230,9 +232,8 @@ def trigger_run(mode: str = "live") -> bool:
         if _state["live_running"]:
             return False
         _state["live_running"] = True
-
-    lb.clear_stop("live")
-    lb.clear_stop("intelligence")
+        lb.clear_stop("live")
+        lb.clear_stop("intelligence")
     t = threading.Thread(target=_run_pipeline, daemon=True)
     t.start()
     return True
